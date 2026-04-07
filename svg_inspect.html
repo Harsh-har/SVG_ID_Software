@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Plan SVG Editor</title>
+    <title>Floor Plan SVG Editor - With Relations</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <style>
@@ -85,7 +85,17 @@
             flex-shrink: 0;
         }
         .resizer:hover, .resizer.resizing {
-            background-color: #6366f1; /* Indigo-500 */
+            background-color: #6366f1;
+        }
+
+        /* Relation Flash Animation */
+        @keyframes relationFlash {
+            0% { outline: 2px solid #10b981; outline-offset: 2px; }
+            50% { outline: 6px solid #34d399; outline-offset: 4px; }
+            100% { outline: 2px solid #10b981; outline-offset: 2px; }
+        }
+        .relation-flash {
+            animation: relationFlash 0.5s ease-in-out;
         }
     </style>
 </head>
@@ -99,7 +109,7 @@
             </div>
             <div>
                 <h1 class="font-bold text-lg text-slate-800 tracking-tight leading-tight">Floor Plan Editor</h1>
-                <p class="text-[10px] text-slate-400 font-medium">SVG Inspector</p>
+                <p class="text-[10px] text-slate-400 font-medium">SVG Inspector + Relations</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -150,6 +160,9 @@
                 </button>
                 <button id="tab-btn-props" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors" onclick="switchLeftTab('props')">
                     Properties
+                </button>
+                <button id="tab-btn-relations" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors" onclick="switchLeftTab('relations')">
+                    Relations
                 </button>
             </div>
 
@@ -216,6 +229,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Relations Panel -->
+            <div id="panel-relations" class="flex-1 overflow-y-auto hidden bg-white p-4">
+                <div class="mb-4">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+                        <span>Relation Groups</span>
+                        <button onclick="createNewRelationGroup()" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded transition-colors flex items-center gap-1">
+                            <i data-lucide="plus" class="w-3 h-3"></i> New Group
+                        </button>
+                    </h3>
+                    
+                    <div class="text-xs text-slate-500 mb-3 p-2 bg-blue-50 rounded-lg">
+                        <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
+                        <strong>Double-click</strong> or <strong>Long-press (500ms)</strong> on any element to add it to selected relation group.
+                    </div>
+                    
+                    <div id="relation-groups-list" class="space-y-3">
+                        <!-- Dynamic relation groups will appear here -->
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- LEFT RESIZER -->
@@ -227,10 +261,11 @@
             <div class="bg-white border-b border-slate-200 px-4 py-1 flex items-center justify-between text-xs text-slate-500 h-10 shadow-sm z-10 shrink-0">
                 <div id="status-bar" class="truncate max-w-[50%]">No file loaded</div>
                 <div class="flex gap-2 items-center bg-slate-50 rounded border border-slate-200 p-1">
-                    <span class="text-[10px] uppercase font-bold text-slate-400 px-2 hidden sm:inline">Hold Shift to Multi-Select</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 px-2 hidden sm:inline">
+                        <span id="multi-select-hint">Hold Shift to Multi-Select</span>
+                    </span>
                     <div class="w-px h-4 bg-slate-200 mx-1"></div>
                     <i data-lucide="zoom-in" class="w-3 h-3 text-slate-400"></i>
-                    <!-- Zoom Slider -->
                     <input type="range" id="zoom-slider" min="10" max="500" value="100" class="w-24 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
                     <span id="zoom-level" class="px-1 min-w-[3rem] text-center font-mono">100%</span>
                     <button id="zoom-reset" class="p-1 hover:bg-slate-200 rounded" title="Reset Zoom">
@@ -289,6 +324,11 @@
         <div class="menu-item" onclick="selectSimilar()">
             <i data-lucide="copy" class="w-4 h-4"></i>
             Select Similar
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="addToSelectedRelation()">
+            <i data-lucide="link-2" class="w-4 h-4"></i>
+            Add to Relation
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" onclick="deleteSelected()">
@@ -393,6 +433,12 @@
             { name: 'Plumbing', icon: 'droplets', style: { fill: '#bae6fd', stroke: '#0ea5e9', strokeWidth: '1px', opacity: '1'} }
         ];
 
+        // --- Relation Data ---
+        let relationGroups = [
+            { id: 'Relation', name: 'Main Relation', elements: [] }
+        ];
+        let currentRelationGroupId = 'Relation';
+
         // --- State ---
         const state = {
             scale: 1,
@@ -407,7 +453,9 @@
                 active: false,
                 prefix: 'Light ',
                 counter: 1
-            }
+            },
+            longPressTimeout: null,
+            isLongPressing: false
         };
 
         // --- DOM Elements ---
@@ -482,7 +530,195 @@
 
         // --- Initialization ---
         function initIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
-        window.addEventListener('load', () => { initIcons(); renderPresets(); });
+        window.addEventListener('load', () => { initIcons(); renderPresets(); renderRelationGroups(); });
+
+        // --- Relation Functions ---
+        function renderRelationGroups() {
+            const container = document.getElementById('relation-groups-list');
+            if (!container) return;
+            
+            container.innerHTML = relationGroups.map((group, idx) => `
+                <div class="border ${currentRelationGroupId === group.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'} rounded-lg overflow-hidden transition-all">
+                    <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50" onclick="selectRelationGroup('${group.id}')">
+                        <div class="flex items-center gap-2 flex-1">
+                            <i data-lucide="link-2" class="w-4 h-4 ${currentRelationGroupId === group.id ? 'text-emerald-600' : 'text-slate-400'}"></i>
+                            <input type="text" value="${group.name}" class="text-xs font-medium bg-transparent border-none focus:ring-1 focus:ring-emerald-500 rounded px-1 w-32" onchange="renameRelationGroup('${group.id}', this.value)" onclick="event.stopPropagation()">
+                            <span class="text-[10px] text-slate-400">(${group.elements.length} items)</span>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="event.stopPropagation(); addToRelationFromGroupPrompt('${group.id}')" class="p-1 text-slate-400 hover:text-emerald-600 transition-colors" title="Add selected elements">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); removeRelationGroup('${group.id}')" class="p-1 text-slate-400 hover:text-red-600 transition-colors" title="Delete group">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="group-items-${group.id.replace(/[^a-zA-Z0-9]/g, '_')}" class="border-t border-slate-100 p-2 space-y-1 max-h-48 overflow-y-auto text-[11px]">
+                        ${group.elements.length === 0 ? 
+                            '<div class="text-slate-400 italic text-[10px] text-center py-2">No elements. Double-click or long-press on canvas elements to add.</div>' : 
+                            group.elements.map(el => `
+                                <div class="flex items-center justify-between group-item px-1 py-0.5 hover:bg-slate-100 rounded cursor-pointer" onclick="selectElementById('${el.id}')">
+                                    <span class="font-mono text-slate-600 truncate flex-1">${el.id || el.tagName || 'Unknown'}</span>
+                                    <button onclick="event.stopPropagation(); removeFromRelationGroup('${group.id}', '${el.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                        <i data-lucide="x" class="w-3 h-3"></i>
+                                    </button>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
+            `).join('');
+            initIcons();
+        }
+
+        function selectRelationGroup(groupId) {
+            currentRelationGroupId = groupId;
+            renderRelationGroups();
+            statusBar.textContent = `Relation group "${relationGroups.find(g => g.id === groupId)?.name}" selected`;
+        }
+
+        function renameRelationGroup(groupId, newName) {
+            const group = relationGroups.find(g => g.id === groupId);
+            if (group) {
+                group.name = newName;
+                renderRelationGroups();
+                statusBar.textContent = `Group renamed to "${newName}"`;
+            }
+        }
+
+        function createNewRelationGroup() {
+            const newId = `Relation_${Date.now()}`;
+            const newName = `Relation ${relationGroups.length + 1}`;
+            relationGroups.push({ id: newId, name: newName, elements: [] });
+            currentRelationGroupId = newId;
+            renderRelationGroups();
+            statusBar.textContent = `New relation group "${newName}" created`;
+        }
+
+        function removeRelationGroup(groupId) {
+            if (relationGroups.length === 1) {
+                alert("Cannot delete the last relation group. Create a new one first.");
+                return;
+            }
+            relationGroups = relationGroups.filter(g => g.id !== groupId);
+            if (currentRelationGroupId === groupId) {
+                currentRelationGroupId = relationGroups[0]?.id || null;
+            }
+            renderRelationGroups();
+            statusBar.textContent = `Relation group removed`;
+        }
+
+        function addElementToRelationGroup(element, groupId) {
+            const group = relationGroups.find(g => g.id === groupId);
+            if (!group) return false;
+            
+            // Check if already exists
+            if (group.elements.some(el => el.id === element.id && el.tagName === element.tagName)) {
+                statusBar.textContent = `Element already in this relation group`;
+                return false;
+            }
+            
+            // Store element reference (id and tagName for persistence)
+            group.elements.push({
+                id: element.id || `temp_${Date.now()}`,
+                tagName: element.tagName,
+                originalElement: element // Keep reference for highlighting
+            });
+            
+            renderRelationGroups();
+            
+            // Flash the element
+            element.classList.add('relation-flash');
+            setTimeout(() => element.classList.remove('relation-flash'), 500);
+            
+            statusBar.textContent = `Added "${element.id || element.tagName}" to ${group.name}`;
+            return true;
+        }
+
+        function addSelectedToRelation() {
+            if (state.selectedElements.size === 0) {
+                alert("Please select at least one element first.");
+                return;
+            }
+            
+            const group = relationGroups.find(g => g.id === currentRelationGroupId);
+            if (!group) {
+                alert("No relation group selected.");
+                return;
+            }
+            
+            state.selectedElements.forEach(el => {
+                addElementToRelationGroup(el, currentRelationGroupId);
+            });
+        }
+
+        function addToSelectedRelation() {
+            if (state.contextTarget) {
+                addElementToRelationGroup(state.contextTarget, currentRelationGroupId);
+            }
+        }
+
+        function addToRelationFromGroupPrompt(groupId) {
+            if (state.selectedElements.size === 0) {
+                alert("Please select elements on the canvas first.");
+                return;
+            }
+            
+            state.selectedElements.forEach(el => {
+                addElementToRelationGroup(el, groupId);
+            });
+        }
+
+        function removeFromRelationGroup(groupId, elementId) {
+            const group = relationGroups.find(g => g.id === groupId);
+            if (group) {
+                group.elements = group.elements.filter(el => el.id !== elementId);
+                renderRelationGroups();
+                statusBar.textContent = `Element removed from ${group.name}`;
+            }
+        }
+
+        function selectElementById(elementId) {
+            const svg = svgContainer.querySelector('svg');
+            if (!svg) return;
+            
+            const element = svg.querySelector(`[id="${elementId}"]`);
+            if (element) {
+                handleSelection(element, false);
+                // Scroll to element
+                const box = getTransformedBox(element);
+                canvasWrapper.scrollTo({
+                    left: box.left - 100,
+                    top: box.top - 100,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        // Update the addToRelationGroup function to work with double-click and long-press
+        function handleDoubleClickForRelation(element) {
+            if (state.autoNaming.active) return; // Don't interfere with auto-naming mode
+            
+            addElementToRelationGroup(element, currentRelationGroupId);
+        }
+
+        function startLongPress(element) {
+            state.longPressTimeout = setTimeout(() => {
+                state.isLongPressing = true;
+                if (!state.autoNaming.active) {
+                    handleDoubleClickForRelation(element);
+                }
+            }, 500);
+        }
+
+        function cancelLongPress() {
+            if (state.longPressTimeout) {
+                clearTimeout(state.longPressTimeout);
+                state.longPressTimeout = null;
+            }
+            state.isLongPressing = false;
+        }
 
         // --- Auto Rename Logic ---
         function toggleAutoNameMode() {
@@ -496,8 +732,8 @@
                 btnBg.classList.replace('bg-slate-200', 'bg-indigo-600');
                 controls.classList.remove('opacity-50', 'pointer-events-none');
                 deselectAll();
-                document.body.style.cursor = 'alias'; // Change cursor to indicate mode
-                statusBar.textContent = "Auto-Rename Mode: ON";
+                document.body.style.cursor = 'alias';
+                statusBar.textContent = "Auto-Rename Mode: ON - Click elements to rename them";
             } else {
                 btnKnob.classList.remove('translate-x-5');
                 btnBg.classList.replace('bg-indigo-600', 'bg-slate-200');
@@ -511,34 +747,29 @@
             const newId = `${state.autoNaming.prefix}${state.autoNaming.counter}`;
             el.id = newId;
             
-            // Increment
             state.autoNaming.counter++;
             document.getElementById('input-auto-counter').value = state.autoNaming.counter;
             
-            // Visual Feedback
             statusBar.textContent = `Renamed to: ${newId}`;
             
-            // Update Tree Label
             const treeId = state.nodeMap.get(el);
             if(treeId) {
                 const label = document.querySelector(`#${treeId} span.truncate`);
                 if(label) {
                     label.textContent = newId;
-                    // Flash effect in tree
                     label.classList.add('text-indigo-600', 'font-bold');
                     setTimeout(() => label.classList.remove('text-indigo-600', 'font-bold'), 500);
                 }
             }
 
-            // Flash element outline
             const originalOutline = el.style.outline;
-            el.style.outline = "3px solid #6366f1"; // Indigo flash
+            el.style.outline = "3px solid #6366f1";
             setTimeout(() => {
                 el.style.outline = originalOutline;
             }, 300);
         }
 
-        // --- Context Menu (Select Similar) ---
+        // --- Context Menu ---
         canvasWrapper.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             const target = e.target;
@@ -736,13 +967,14 @@
         // --- Tabs Logic ---
         function switchLeftTab(tab) {
             state.activeLeftTab = tab;
-            const tabs = ['presets', 'props'];
+            const tabs = ['presets', 'props', 'relations'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
                 const panel = document.getElementById(`panel-${t}`);
                 if(btn) btn.className = t === tab ? "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 transition-colors" : "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors";
                 if(panel) panel.classList.toggle('hidden', t !== tab);
             });
+            if (tab === 'relations') renderRelationGroups();
         }
 
         // --- File Handling ---
@@ -768,7 +1000,6 @@
             }
         }
 
-        // Close export menu when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#export-btn') && !e.target.closest('#export-menu')) {
                 toggleExportMenu(false);
@@ -822,8 +1053,6 @@
             toggleExportMenu(false);
         }
 
-        // Removed old downloadSVG function in favor of handleExport
-
         function loadFile(file) {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -839,7 +1068,6 @@
                     attachSVGListeners(svg);
                     rebuildLayersTree(svg);
                     statusBar.textContent = `${file.name} loaded`;
-                    // Reset zoom slider
                     zoomSlider.value = 100;
                     zoomDisplay.textContent = '100%';
                 }
@@ -847,27 +1075,54 @@
             reader.readAsText(file);
         }
 
-        // --- Interaction Logic ---
+        // --- Interaction Logic with Double-click and Long-press ---
         function attachSVGListeners(svgElement) {
             svgElement.addEventListener('mouseover', (e) => { if (e.target !== svgElement) highlightElement(e.target); });
             svgElement.addEventListener('mouseout', () => hideHighlight());
+            
+            // Double-click handler for relation
+            svgElement.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                if (e.target !== svgElement && !state.autoNaming.active) {
+                    handleDoubleClickForRelation(e.target);
+                }
+            });
+            
+            // Long-press handlers
+            svgElement.addEventListener('mousedown', (e) => {
+                if (e.target !== svgElement && !state.autoNaming.active) {
+                    startLongPress(e.target);
+                }
+            });
+            
+            svgElement.addEventListener('mouseup', () => cancelLongPress());
+            svgElement.addEventListener('mouseleave', () => cancelLongPress());
+            
+            // Click handler for selection and auto-rename
             svgElement.addEventListener('click', (e) => {
-                e.stopPropagation(); e.preventDefault();
+                e.stopPropagation();
+                e.preventDefault();
                 
-                // New: Check for Auto-Name Mode
+                // Cancel long press if click happens
+                cancelLongPress();
+                
+                // Check for Auto-Name Mode
                 if (state.autoNaming.active) {
                     if (e.target !== svgElement) {
                         applyAutoName(e.target);
+                        handleSelection(e.target, false);
                     }
-                    return; // Skip normal selection logic
+                    return;
                 }
 
+                // Normal selection mode
                 if (e.target !== svgElement) {
                     handleSelection(e.target, e.shiftKey || e.ctrlKey);
                 } else {
                     deselectAll(); 
                 }
             });
+            
             canvasWrapper.addEventListener('click', (e) => { if (e.target === canvasWrapper || e.target === artboard) deselectAll(); });
         }
 
@@ -876,11 +1131,13 @@
             const wrapperRect = canvasWrapper.getBoundingClientRect();
             return { top: rect.top - wrapperRect.top + canvasWrapper.scrollTop, left: rect.left - wrapperRect.left + canvasWrapper.scrollLeft, width: rect.width, height: rect.height };
         }
+        
         function highlightElement(el) {
             const box = getTransformedBox(el);
             highlightBox.style.display = 'block'; highlightBox.style.top = `${box.top}px`; highlightBox.style.left = `${box.left}px`; highlightBox.style.width = `${box.width}px`; highlightBox.style.height = `${box.height}px`;
             statusBar.textContent = `Hover: <${el.tagName}> ${el.id ? '#'+el.id : ''}`;
         }
+        
         function hideHighlight() { highlightBox.style.display = 'none'; }
 
         function handleSelection(el, isMultiSelect) {
@@ -1067,11 +1324,9 @@
                 row.className = `layer-item flex items-center py-1.5 px-2 border-b border-slate-100 cursor-pointer group`;
                 row.style.paddingLeft = `${(depth * 12) + 4}px`; row.id = nodeId;
                 
-                // Drag Attributes
                 row.setAttribute('draggable', 'true');
-                row.svgNode = node; // Attach SVG node reference for drag logic
+                row.svgNode = node;
 
-                // Drag Event Listeners
                 row.addEventListener('dragstart', onLayerDragStart);
                 row.addEventListener('dragover', onLayerDragOver);
                 row.addEventListener('dragleave', onLayerDragLeave);
@@ -1083,7 +1338,7 @@
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = "text-slate-400 hover:text-slate-600 w-5 h-5 flex items-center justify-center mr-1 tree-toggle-btn";
                 if (hasChildren) {
-                    const isExpanded = depth === 0; // Root Expanded by default
+                    const isExpanded = depth === 0;
                     toggleBtn.innerHTML = isExpanded ? `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>` : `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`;
                     toggleBtn.onclick = (e) => {
                         e.stopPropagation();
@@ -1141,25 +1396,22 @@
             initIcons();
         }
 
-        // --- Drag and Drop Logic Implementation ---
+        // --- Drag and Drop Logic ---
         function onLayerDragStart(e) {
-            // e.target is the .layer-item div
             state.draggedLayer = e.target.svgNode;
             e.dataTransfer.effectAllowed = 'move';
             e.target.style.opacity = '0.5';
         }
 
         function onLayerDragOver(e) {
-            e.preventDefault(); // Necessary to allow dropping
+            e.preventDefault();
             e.stopPropagation();
             
-            // Find the closest layer-item being hovered
             const targetRow = e.target.closest('.layer-item');
             if (!targetRow || !state.draggedLayer) return;
 
             const targetNode = targetRow.svgNode;
             
-            // Prevent dragging into itself
             if (state.draggedLayer === targetNode || state.draggedLayer.contains(targetNode)) {
                 e.dataTransfer.dropEffect = 'none';
                 return;
@@ -1167,19 +1419,12 @@
 
             e.dataTransfer.dropEffect = 'move';
 
-            // Calculate drop position based on mouse Y in the row
             const rect = targetRow.getBoundingClientRect();
             const relY = e.clientY - rect.top;
             const height = rect.height;
             
-            // Reset classes
             targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
 
-            // Logic: 
-            // Top 25%: Insert Before
-            // Bottom 25%: Insert After
-            // Middle 50%: Insert Inside (if it's a group/svg)
-            
             const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
             
             if (relY < height * 0.25) {
@@ -1189,7 +1434,6 @@
             } else if (isGroup) {
                 targetRow.classList.add('drop-inside');
             } else {
-                // If middle of a non-group item, default to after
                 targetRow.classList.add('drop-after');
             }
         }
@@ -1208,43 +1452,35 @@
             const targetRow = e.target.closest('.layer-item');
             if (!targetRow || !state.draggedLayer) return;
 
-            // Clean up styles
             targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
             document.querySelectorAll('.layer-item').forEach(el => el.style.opacity = '1');
 
             const targetNode = targetRow.svgNode;
             
-            // Re-calculate position logic to decide action
             const rect = targetRow.getBoundingClientRect();
             const relY = e.clientY - rect.top;
             const height = rect.height;
             const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
 
             if (relY < height * 0.25) {
-                // Before
                 if (targetNode.parentNode) {
                     targetNode.parentNode.insertBefore(state.draggedLayer, targetNode);
                 }
             } else if (relY > height * 0.75) {
-                // After
                 if (targetNode.parentNode) {
                     targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling);
                 }
             } else if (isGroup) {
-                // Inside
                 targetNode.appendChild(state.draggedLayer);
             } else {
-                // Default After for non-groups in middle
                 if (targetNode.parentNode) {
                     targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling);
                 }
             }
 
-            // Rebuild tree to reflect new DOM structure
             rebuildLayersTree(svgContainer.querySelector('svg'));
             state.draggedLayer = null;
         }
-
 
         function rgbToHex(rgb) {
             if (!rgb || rgb === 'none' || rgb === 'transparent') return 'none';
@@ -1255,8 +1491,7 @@
             return "#" + ((1 << 24) + (parseInt(parts[0]) << 16) + (parseInt(parts[1]) << 8) + parseInt(parts[2])).toString(16).slice(1).toUpperCase();
         }
 
-        // Zoom Logic Update
-        // Bind slider to applyZoom
+        // Zoom Logic
         zoomSlider.addEventListener('input', (e) => {
             state.scale = parseInt(e.target.value) / 100;
             applyZoom();
@@ -1269,19 +1504,12 @@
         });
 
         function applyZoom() {
-            // Apply scale to the artboard (canvas), effectively zooming everything
             const artboard = document.getElementById('artboard');
             if (artboard) {
-                // Use transform-origin top-left to keep position predictable or center if preferred
-                // The CSS sets origin-top-left
                 artboard.style.transform = `scale(${state.scale})`;
             }
-            
-            // Recalculate overlay positions
             hideHighlight(); 
             updateSelectionVisuals();
-            
-            // Update Text Display
             zoomDisplay.textContent = `${Math.round(state.scale * 100)}%`;
         }
     </script>
