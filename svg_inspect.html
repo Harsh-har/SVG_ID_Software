@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Plan SVG Editor - With Relations</title>
+    <title>Floor Plan SVG Editor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <style>
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -15,1503 +14,1454 @@
 
         .checkerboard {
             background-color: #ffffff;
-            background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
-                              linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
-                              linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+            background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                              linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
                               linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
 
-        /* The highlighter overlay */
         #highlight-box {
             position: absolute; pointer-events: none;
-            border: 2px solid #3b82f6; background-color: rgba(59, 130, 246, 0.1);
+            border: 2px solid #3b82f6; background-color: rgba(59,130,246,0.08);
             z-index: 50; transition: all 0.1s ease-out; display: none;
         }
-
-        /* Container for multiple selection boxes */
         #selection-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 60;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 60;
         }
-        
         .selection-box {
             position: absolute;
             border: 2px dashed #ef4444;
-            background-color: rgba(239, 68, 68, 0.05);
+            background-color: rgba(239,68,68,0.04);
         }
 
-        /* Tree View Specifics */
         .layer-item { transition: background-color 0.1s, border-color 0.1s; border: 2px solid transparent; }
         .layer-item:hover { background-color: #f1f5f9; }
         .layer-item.active-layer { background-color: #eff6ff; color: #1e40af; border-left-color: #3b82f6; }
-        .layer-item.active-layer .text-slate-500 { color: #60a5fa; } 
-        .tree-line { border-left: 1px solid #e2e8f0; }
-
-        /* Drag & Drop Visuals */
         .layer-item.drop-inside { background-color: #dbeafe; border-color: #3b82f6; border-radius: 4px; }
         .layer-item.drop-before { border-top: 2px solid #f97316; }
         .layer-item.drop-after { border-bottom: 2px solid #f97316; }
 
-        /* Color Input Reset */
         input[type="color"] { -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; overflow: hidden; background: none; }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; border: 1px solid #cbd5e1; }
 
-        /* Context Menu */
         #context-menu {
-            position: fixed; z-index: 100; width: 150px; background: white; border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid #e2e8f0; display: none;
+            position: fixed; z-index: 100; width: 180px; background: white; border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; display: none;
         }
-        .menu-item {
-            padding: 8px 12px; font-size: 13px; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 8px;
-        }
+        .menu-item { padding: 8px 12px; font-size: 13px; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 8px; }
         .menu-item:hover { background-color: #f8fafc; color: #3b82f6; }
         .menu-item:first-child { border-top-left-radius: 8px; border-top-right-radius: 8px; }
         .menu-item:last-child { border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
-        .menu-divider { height: 1px; background-color: #f1f5f9; margin: 4px 0; }
+        .menu-divider { height: 1px; background-color: #f1f5f9; margin: 2px 0; }
 
-        /* Resizer Styles */
-        .resizer {
-            width: 4px;
-            background-color: #e2e8f0;
-            cursor: col-resize;
-            transition: background-color 0.2s;
-            z-index: 40;
-            flex-shrink: 0;
-        }
-        .resizer:hover, .resizer.resizing {
-            background-color: #6366f1;
-        }
+        .resizer { width: 4px; background-color: #e2e8f0; cursor: col-resize; transition: background-color 0.2s; z-index: 40; flex-shrink: 0; }
+        .resizer:hover, .resizer.resizing { background-color: #6366f1; }
 
-        /* Relation Flash Animation */
         @keyframes relationFlash {
             0% { outline: 2px solid #10b981; outline-offset: 2px; }
             50% { outline: 6px solid #34d399; outline-offset: 4px; }
             100% { outline: 2px solid #10b981; outline-offset: 2px; }
         }
-        .relation-flash {
-            animation: relationFlash 0.5s ease-in-out;
+        .relation-flash { animation: relationFlash 0.5s ease-in-out; }
+
+        .inline-rename {
+            border: 1px solid #6366f1; border-radius: 3px; padding: 1px 4px;
+            font-size: 11px; font-family: monospace; outline: none; width: 120px;
+            background: #eef2ff; color: #3730a3;
         }
+
+        .meta-input-valid   { border-color: #22c55e !important; background: #f0fdf4 !important; }
+        .meta-input-invalid { border-color: #ef4444 !important; background: #fef2f2 !important; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden font-sans">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm z-30 h-14 shrink-0">
-        <div class="flex items-center gap-2">
-            <div class="bg-indigo-600 text-white p-1.5 rounded-lg">
-                <i data-lucide="pen-tool" class="w-5 h-5"></i>
-            </div>
-            <div>
-                <h1 class="font-bold text-lg text-slate-800 tracking-tight leading-tight">Floor Plan Editor</h1>
-                <p class="text-[10px] text-slate-400 font-medium">SVG Inspector + Relations</p>
-            </div>
+<header class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm z-30 h-14 shrink-0">
+    <div class="flex items-center gap-2">
+        <div class="bg-indigo-600 text-white p-1.5 rounded-lg">
+            <i data-lucide="pen-tool" class="w-5 h-5"></i>
         </div>
-        <div class="flex items-center gap-3">
-            <button onclick="document.getElementById('underlay-input').click()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2 shadow-sm" title="Upload an image to trace over">
-                <i data-lucide="image-plus" class="w-3 h-3"></i>
-                <span>Underlay</span>
-                <input type="file" id="underlay-input" accept="image/*" class="hidden">
+        <div>
+            <h1 class="font-bold text-lg text-slate-800 tracking-tight leading-tight">Floor Plan Editor</h1>
+            <p class="text-[10px] text-slate-400 font-medium">SVG Inspector · Relations · Metadata</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <button onclick="document.getElementById('underlay-input').click()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2 shadow-sm">
+            <i data-lucide="image-plus" class="w-3 h-3"></i> Underlay
+            <input type="file" id="underlay-input" accept="image/*" class="hidden">
+        </button>
+        <div class="h-6 w-px bg-slate-200"></div>
+        <div class="relative">
+            <button onclick="toggleExportMenu()" id="export-btn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2 shadow-sm">
+                <i data-lucide="download" class="w-3 h-3"></i> Export <i data-lucide="chevron-down" class="w-3 h-3 ml-1 text-slate-400"></i>
             </button>
-            <div class="h-6 w-px bg-slate-200"></div>
-            
-            <!-- Export Dropdown -->
-            <div class="relative">
-                <button onclick="toggleExportMenu()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2 shadow-sm" id="export-btn">
-                    <i data-lucide="download" class="w-3 h-3"></i>
-                    <span>Export</span>
-                    <i data-lucide="chevron-down" class="w-3 h-3 ml-1 text-slate-400"></i>
-                </button>
-                <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
-                    <button onclick="handleExport('download')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                        <i data-lucide="file-down" class="w-3.5 h-3.5 text-indigo-600"></i> Download .SVG
-                    </button>
-                    <button onclick="handleExport('copy')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                        <i data-lucide="code" class="w-3.5 h-3.5 text-slate-500"></i> Copy SVG Code
-                    </button>
-                    <button onclick="handleExport('css')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                        <i data-lucide="file-code" class="w-3.5 h-3.5 text-slate-500"></i> Copy CSS Data URI
-                    </button>
-                </div>
+            <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                <button onclick="handleExport('download')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"><i data-lucide="file-down" class="w-3.5 h-3.5 text-indigo-600"></i> Download .SVG</button>
+                <button onclick="handleExport('copy')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"><i data-lucide="code" class="w-3.5 h-3.5 text-slate-500"></i> Copy SVG Code</button>
+                <button onclick="handleExport('css')" class="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"><i data-lucide="file-code" class="w-3.5 h-3.5 text-slate-500"></i> Copy CSS Data URI</button>
             </div>
-
-            <label class="cursor-pointer bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2 shadow-sm">
-                <i data-lucide="folder-open" class="w-3 h-3"></i>
-                <span>Open File</span>
-                <input type="file" id="file-input" accept=".svg" class="hidden">
-            </label>
         </div>
-    </header>
+        <label class="cursor-pointer bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2 shadow-sm">
+            <i data-lucide="folder-open" class="w-3 h-3"></i> Open File
+            <input type="file" id="file-input" accept=".svg" class="hidden">
+        </label>
+    </div>
+</header>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex overflow-hidden">
-        
-        <!-- LEFT SIDEBAR: Presets & Properties -->
-        <aside id="left-sidebar" class="w-80 bg-white border-r border-slate-200 flex flex-col shadow-xl z-20 shrink-0" style="width: 320px;">
-            <!-- Left Tabs -->
-            <div class="flex border-b border-slate-200 shrink-0">
-                <button id="tab-btn-presets" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 transition-colors" onclick="switchLeftTab('presets')">
-                    Presets
-                </button>
-                <button id="tab-btn-props" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors" onclick="switchLeftTab('props')">
-                    Properties
-                </button>
-                <button id="tab-btn-relations" class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors" onclick="switchLeftTab('relations')">
-                    Relations
-                </button>
+<main class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="left-sidebar" class="bg-white border-r border-slate-200 flex flex-col shadow-xl z-20 shrink-0" style="width:340px;">
+        <div class="flex border-b border-slate-200 shrink-0">
+            <button id="tab-btn-rename" onclick="switchLeftTab('rename')"
+                class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 transition-colors">
+                ID Rename
+            </button>
+            <button id="tab-btn-relations" onclick="switchLeftTab('relations')"
+                class="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors">
+                Relations
+            </button>
+        </div>
+
+        <!-- ID RENAME PANEL -->
+        <div id="panel-rename" class="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-5">
+
+            <!-- 1. AUTO RENAME -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i data-lucide="text-cursor-input" class="w-3 h-3"></i> Auto Rename
+                </h3>
+                <div class="bg-white border border-slate-200 rounded-lg p-3 space-y-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-700">Enable Mode</span>
+                        <button id="btn-auto-name-toggle" onclick="toggleAutoNameMode()"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-200 transition-colors focus:outline-none">
+                            <span id="btn-auto-name-knob" class="translate-x-1 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm"></span>
+                        </button>
+                    </div>
+                    <div id="auto-name-controls" class="space-y-2 opacity-50 pointer-events-none transition-opacity">
+                        <div class="flex gap-2">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Prefix</label>
+                                <input type="text" id="input-auto-prefix" value="Light "
+                                    class="w-full text-xs border border-slate-200 rounded px-2 py-1.5 outline-none focus:border-indigo-500"
+                                    oninput="state.autoNaming.prefix = this.value">
+                            </div>
+                            <div class="w-16">
+                                <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Start #</label>
+                                <input type="number" id="input-auto-counter" value="1" min="0"
+                                    class="w-full text-xs border border-slate-200 rounded px-2 py-1.5 outline-none focus:border-indigo-500"
+                                    oninput="state.autoNaming.counter = parseInt(this.value)||1">
+                            </div>
+                        </div>
+                        <div class="p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 leading-snug flex gap-1.5">
+                            <i data-lucide="info" class="w-3 h-3 flex-shrink-0 mt-0.5"></i>
+                            <span>Sirf <strong>SVG ID</strong> set hoga. Metadata ID alag se manually enter karna hoga.</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 italic">
+                            <i data-lucide="mouse-pointer-click" class="w-3 h-3 inline mr-0.5"></i>
+                            Canvas element click karo to sequentially rename
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Presets Panel -->
-            <div id="panel-presets" class="flex-1 overflow-y-auto bg-slate-50 p-4">
-                <div class="mb-4">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex justify-between items-center">
-                        Styles Library
-                        <button onclick="openPresetModal(null)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded transition-colors">+ New</button>
-                    </h3>
-                    <div id="presets-list" class="grid grid-cols-1 gap-2"></div>
+            <!-- 2. MANUAL RENAME -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i data-lucide="pencil" class="w-3 h-3"></i> Manual Rename
+                </h3>
+                <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                    <div id="manual-rename-hint" class="p-4 text-xs text-slate-400 italic text-center">
+                        <i data-lucide="mouse-pointer" class="w-4 h-4 mx-auto mb-1 text-slate-300"></i>
+                        Canvas par element select karo
+                    </div>
+                    <div id="manual-rename-form" class="hidden">
+                        <!-- Selected element info -->
+                        <div class="p-3 bg-slate-50 border-b border-slate-100">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase">Selected</span>
+                                <span id="manual-tag-badge" class="text-[10px] bg-indigo-100 text-indigo-700 font-mono px-1.5 py-0.5 rounded font-bold"></span>
+                            </div>
+                            <div id="manual-current-id" class="text-xs font-mono text-slate-700 font-bold truncate"></div>
+                            <div class="text-[10px] text-slate-400 mt-1">
+                                Parent: <span id="manual-parent-id" class="font-mono text-slate-500"></span>
+                            </div>
+                        </div>
+
+                        <!-- SVG ID rename -->
+                        <div class="p-3 border-b border-slate-100">
+                            <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1.5">SVG Element ID</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="manual-new-id"
+                                    class="flex-1 text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="New SVG ID...">
+                                <button onclick="applySVGIdOnly()"
+                                    class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded shadow-sm transition-colors">
+                                    Rename
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- METADATA ID -->
+                        <div class="p-3">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-[10px] text-emerald-700 font-bold uppercase flex items-center gap-1">
+                                    <i data-lucide="hash" class="w-3 h-3"></i> Metadata ID
+                                </label>
+                                <span class="text-[9px] text-slate-400">Sirf 0 se N digits</span>
+                            </div>
+
+                            <!-- Current metadata value -->
+                            <div id="meta-existing-display" class="hidden mb-2 flex items-center gap-2">
+                                <span class="text-[10px] text-slate-400">Current:</span>
+                                <span id="meta-existing-val" class="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded"></span>
+                                <span class="text-[9px] text-slate-400 italic">(saved)</span>
+                            </div>
+
+                            <!-- Numbers used in same parent group -->
+                            <div id="meta-used-numbers" class="hidden mb-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] leading-snug">
+                                <span class="font-bold text-red-700">Is group mein already used:</span>
+                                <span id="meta-used-list" class="font-mono text-red-600 ml-1"></span>
+                            </div>
+
+                            <div class="flex gap-2 items-start">
+                                <div class="flex-1">
+                                    <input type="text" id="meta-id-input"
+                                        inputmode="numeric"
+                                        class="w-full text-base border-2 border-slate-300 rounded-lg px-3 py-2 font-mono font-bold focus:outline-none transition-colors"
+                                        placeholder="0, 1, 2 ... N">
+                                    <div id="meta-id-feedback" class="text-[10px] mt-1 min-h-[14px]"></div>
+                                </div>
+                                <button onclick="applyMetaId()"
+                                    class="mt-0.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors">
+                                    Save
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-2 leading-snug">
+                                ⚠ Same parent &lt;g&gt; mein duplicate number allow nahi hai. Auto Rename ya Bulk Rename se kabhi set nahi hota.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="pt-4 border-t border-slate-200">
-                    <button onclick="openPresetModal(null, true)" class="w-full py-2 px-3 bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 rounded-lg text-xs font-medium text-slate-600 flex items-center justify-center gap-2 transition-all">
-                        <i data-lucide="copy-plus" class="w-3 h-3"></i>
-                        New from Selection
+            </div>
+
+            <!-- 3. BULK FIND & REPLACE -->
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i data-lucide="replace" class="w-3 h-3"></i> Bulk Find &amp; Replace ID
+                </h3>
+                <div class="bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-sm">
+                    <div>
+                        <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Find in IDs</label>
+                        <input type="text" id="bulk-find" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="old_prefix">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Replace with</label>
+                        <input type="text" id="bulk-replace" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="new_prefix">
+                    </div>
+                    <div class="p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 flex gap-1">
+                        <i data-lucide="alert-triangle" class="w-3 h-3 flex-shrink-0 mt-0.5"></i>
+                        <span>Sirf SVG IDs badlega — Metadata IDs unchanged rahenge.</span>
+                    </div>
+                    <button onclick="applyBulkRename()" class="w-full py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded transition-colors">
+                        Apply to All Matching Elements
+                    </button>
+                    <div id="bulk-rename-result" class="text-[10px] text-slate-500 italic text-center hidden"></div>
+                </div>
+            </div>
+
+            <!-- Rules info -->
+            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 leading-relaxed">
+                <div class="font-bold mb-1.5 flex items-center gap-1.5">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Metadata ID Rules
+                </div>
+                <div class="space-y-1">
+                    <div>✔ Sirf <strong>whole number</strong>: 0, 1, 2 … N</div>
+                    <div>✔ Same parent <code class="bg-emerald-100 px-1 rounded">&lt;g&gt;</code> mein duplicate <strong>nahi</strong> chalega</div>
+                    <div>✔ Auto/Bulk Rename se <strong>kabhi auto-set nahi</strong> hoga</div>
+                    <div>✔ Har element ka Meta ID <strong>user manually</strong> enter karta hai</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RELATIONS PANEL -->
+        <div id="panel-relations" class="flex-1 overflow-y-auto hidden bg-white p-4">
+            <div class="mb-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+                    <span>Relation Groups</span>
+                    <button onclick="createNewRelationGroup()" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3 h-3"></i> New Group
+                    </button>
+                </h3>
+                <div class="text-xs text-slate-500 mb-3 p-2 bg-blue-50 rounded-lg">
+                    <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
+                    <strong>Double-click</strong> ya <strong>Long-press (500ms)</strong> canvas element par to add to active group.
+                </div>
+                <div id="relation-groups-list" class="space-y-3"></div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-200">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <i data-lucide="code" class="w-3 h-3"></i> SVG Output Preview
+                </h4>
+                <div id="relation-svg-preview" class="bg-slate-900 text-emerald-400 rounded-lg p-3 text-[10px] font-mono leading-relaxed overflow-x-auto whitespace-pre max-h-64 overflow-y-auto"></div>
+                <button onclick="copyRelationSVG()" class="mt-2 w-full py-1.5 text-xs font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 rounded flex items-center justify-center gap-1">
+                    <i data-lucide="copy" class="w-3 h-3"></i> Copy Relation SVG
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <div id="resizer-left" class="resizer"></div>
+
+    <!-- CANVAS -->
+    <section class="flex-1 relative flex flex-col min-w-0 bg-slate-100">
+        <div class="bg-white border-b border-slate-200 px-4 py-1 flex items-center justify-between text-xs text-slate-500 h-10 shadow-sm z-10 shrink-0">
+            <div id="status-bar" class="truncate max-w-[55%]">No file loaded</div>
+            <div class="flex gap-2 items-center bg-slate-50 rounded border border-slate-200 p-1">
+                <span class="text-[10px] uppercase font-bold text-slate-400 px-2 hidden sm:inline">Shift = Multi-Select</span>
+                <div class="w-px h-4 bg-slate-200 mx-1"></div>
+                <i data-lucide="zoom-in" class="w-3 h-3 text-slate-400"></i>
+                <input type="range" id="zoom-slider" min="10" max="500" value="100" class="w-24 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                <span id="zoom-level" class="px-1 min-w-[3rem] text-center font-mono">100%</span>
+                <button id="zoom-reset" class="p-1 hover:bg-slate-200 rounded" title="Reset Zoom">
+                    <i data-lucide="maximize" class="w-3 h-3"></i>
+                </button>
+            </div>
+        </div>
+        <div id="canvas-wrapper" class="flex-1 overflow-auto relative bg-slate-200/50 p-8 cursor-crosshair">
+            <div class="shadow-xl bg-white checkerboard relative mx-auto min-h-[500px] min-w-[500px] origin-top-left" id="artboard">
+                <div id="svg-container" class="w-full h-full"></div>
+                <div id="empty-state" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="text-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/80">
+                        <i data-lucide="layout-template" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+                        <p class="text-slate-500 text-sm font-medium">Drag &amp; drop Floor Plan SVG</p>
+                    </div>
+                </div>
+            </div>
+            <div id="highlight-box"></div>
+            <div id="selection-overlay"></div>
+        </div>
+    </section>
+
+    <div id="resizer-right" class="resizer"></div>
+
+    <!-- RIGHT SIDEBAR LAYERS -->
+    <aside id="right-sidebar" class="bg-white border-l border-slate-200 flex flex-col shadow-xl z-20 shrink-0" style="width:300px;">
+        <div class="flex items-center justify-between border-b border-slate-200 p-3 bg-slate-50 shrink-0">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Layers</span>
+            <button onclick="collapseAll()" class="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                <i data-lucide="chevrons-right" class="w-3 h-3"></i> Collapse All
+            </button>
+        </div>
+        <div id="panel-layers" class="flex-1 overflow-y-auto flex flex-col bg-white">
+            <div id="layers-tree" class="flex-1 text-sm font-medium select-none pb-10">
+                <div class="p-8 text-center text-slate-400 text-xs italic">No layers</div>
+            </div>
+        </div>
+    </aside>
+</main>
+
+<!-- CONTEXT MENU -->
+<div id="context-menu">
+    <div class="menu-item" onclick="selectSimilar()"><i data-lucide="copy" class="w-4 h-4"></i> Select Similar</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="contextFocusMetaInput()"><i data-lucide="hash" class="w-4 h-4"></i> Set Metadata ID</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="addContextTargetToRelation()"><i data-lucide="link-2" class="w-4 h-4"></i> Add to Active Relation</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="renameContextTarget()"><i data-lucide="pencil" class="w-4 h-4"></i> Rename SVG ID</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="deleteSelected()"><i data-lucide="trash-2" class="w-4 h-4"></i> Delete</div>
+</div>
+
+<!-- UNDERLAY MODAL -->
+<div id="underlay-modal" class="fixed top-16 right-4 z-50 bg-white rounded-lg shadow-xl border border-slate-200 w-64 p-4 hidden">
+    <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-sm text-slate-700">Image Underlay</h3>
+        <button onclick="document.getElementById('underlay-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div class="space-y-3">
+        <div>
+            <label class="text-xs text-slate-500 font-medium mb-1 block">Opacity</label>
+            <input type="range" id="underlay-opacity" min="0" max="1" step="0.05" value="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateUnderlayOpacity(this.value)">
+        </div>
+        <button onclick="removeUnderlay()" class="w-full py-1.5 text-xs text-red-600 border border-red-200 hover:bg-red-50 rounded">Remove Image</button>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" class="fixed inset-0 bg-black/50 z-[110] hidden flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-72 p-6 text-center">
+        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+            <i data-lucide="trash-2" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800 mb-2" id="confirm-title">Confirm Delete</h3>
+        <p class="text-xs text-slate-500 mb-6" id="confirm-message">Are you sure?</p>
+        <div class="flex gap-2 justify-center">
+            <button onclick="closeConfirmModal()" class="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Cancel</button>
+            <button onclick="executeConfirm()" class="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// =============================================================
+// STATE
+// =============================================================
+let relationGroups = [{ id: 'Relation', name: 'Relation', elements: [], comment: '' }];
+let currentRelationGroupId = 'Relation';
+
+const state = {
+    scale: 1, svgLoaded: false, selectedElements: new Set(),
+    activeLeftTab: 'rename', nodeMap: new Map(), contextTarget: null,
+    underlayImg: null, draggedLayer: null,
+    autoNaming: { active: false, prefix: 'Light ', counter: 1 },
+    longPressTimeout: null, isLongPressing: false,
+    confirmCallback: null, manualRenameTarget: null
+};
+
+// =============================================================
+// METADATA HELPERS
+// Rules:
+//  1. ONLY user can set metadata ID — never auto-set
+//  2. Only whole numbers (0,1,2...N) — no text, no decimals, no negatives
+//  3. No duplicates within the same parent <g> element
+// =============================================================
+
+function getMetadataValue(element) {
+    if (!element) return null;
+    for (let c of element.children) {
+        if (c.tagName === 'metadata') {
+            for (let g of c.children) {
+                if (g.tagName === 'elementid') {
+                    const v = g.textContent.trim();
+                    return v === '' ? null : v;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function writeMetadataValue(element, value) {
+    if (!element) return;
+    let meta = null;
+    for (let c of element.children) { if (c.tagName === 'metadata') { meta = c; break; } }
+    if (!meta) {
+        meta = document.createElementNS('http://www.w3.org/2000/svg', 'metadata');
+        element.insertBefore(meta, element.firstChild);
+    }
+    let eid = null;
+    for (let c of meta.children) { if (c.tagName === 'elementid') { eid = c; break; } }
+    if (!eid) {
+        eid = document.createElementNS('http://www.w3.org/2000/svg', 'elementid');
+        meta.appendChild(eid);
+    }
+    eid.textContent = value;
+}
+
+// Returns parent <g> element or null if parent is <svg>/no group
+function getParentGroup(element) {
+    if (!element) return null;
+    const p = element.parentElement;
+    if (!p || p.tagName === 'svg') return null;
+    if (p.tagName === 'g') return p;
+    return null;
+}
+
+// Returns Set of number-strings already used by siblings in same parent group
+function getUsedMetaIdsInGroup(element) {
+    const used = new Set();
+    const parent = getParentGroup(element);
+    if (!parent) return used;
+    const skip = new Set(['metadata','title','desc','defs','style']);
+    for (let sibling of parent.children) {
+        if (sibling === element) continue;
+        if (skip.has(sibling.tagName)) continue;
+        const val = getMetadataValue(sibling);
+        if (val !== null && /^\d+$/.test(val)) used.add(val);
+    }
+    return used;
+}
+
+// Validate a metadata ID input
+// Returns { valid, error, normalized }
+function validateMetaId(rawValue, element) {
+    const val = rawValue.trim();
+    if (val === '') return { valid: false, error: 'Number enter karo (0 ya usse bada)', normalized: '' };
+    if (!/^\d+$/.test(val)) return { valid: false, error: 'Sirf whole number allowed: 0, 1, 2 … N (no text, no decimal, no negative)', normalized: '' };
+    const usedInGroup = getUsedMetaIdsInGroup(element);
+    if (usedInGroup.has(val)) {
+        return { valid: false, error: `${val} already used hai is parent group mein! Alag number do.`, normalized: val };
+    }
+    return { valid: true, error: null, normalized: val };
+}
+
+// =============================================================
+// LIVE META INPUT VALIDATION
+// =============================================================
+function onMetaInputChange() {
+    const input = document.getElementById('meta-id-input');
+    const feedback = document.getElementById('meta-id-feedback');
+    const el = state.manualRenameTarget;
+    const val = input.value.trim();
+
+    input.classList.remove('meta-input-valid', 'meta-input-invalid');
+    feedback.className = 'text-[10px] mt-1 min-h-[14px]';
+    feedback.textContent = '';
+
+    if (!el || val === '') return;
+
+    const result = validateMetaId(val, el);
+    if (!result.valid) {
+        input.classList.add('meta-input-invalid');
+        feedback.textContent = '✗ ' + result.error;
+        feedback.classList.add('text-red-500');
+    } else {
+        input.classList.add('meta-input-valid');
+        feedback.textContent = '✓ Valid — Save dabao';
+        feedback.classList.add('text-emerald-600');
+    }
+}
+
+function applyMetaId() {
+    const input = document.getElementById('meta-id-input');
+    const feedback = document.getElementById('meta-id-feedback');
+    const el = state.manualRenameTarget;
+    if (!el) return;
+
+    const result = validateMetaId(input.value, el);
+    if (!result.valid) {
+        input.classList.remove('meta-input-valid');
+        input.classList.add('meta-input-invalid');
+        feedback.textContent = '✗ ' + result.error;
+        feedback.className = 'text-[10px] mt-1 min-h-[14px] text-red-500 font-medium';
+        input.focus();
+        return;
+    }
+
+    writeMetadataValue(el, result.normalized);
+    flashElement(el, '#10b981');
+    statusBar.textContent = `Metadata ID "${result.normalized}" saved for #${el.id || el.tagName}`;
+
+    // Refresh panel display
+    refreshManualPanel(el);
+
+    input.value = '';
+    input.classList.remove('meta-input-valid', 'meta-input-invalid');
+    feedback.textContent = `✓ Saved! Metadata ID = ${result.normalized}`;
+    feedback.className = 'text-[10px] mt-1 min-h-[14px] text-emerald-700 font-bold';
+    setTimeout(() => {
+        feedback.textContent = '';
+        feedback.className = 'text-[10px] mt-1 min-h-[14px]';
+    }, 2500);
+
+    // Also update metaId in relation groups list
+    relationGroups.forEach(g => g.elements.forEach(e => {
+        if (e.id === el.id) e.metaId = result.normalized;
+    }));
+    renderRelationGroups();
+    // Rebuild layer tree badge
+    rebuildLayersTree(svgContainer.querySelector('svg'));
+}
+
+function applySVGIdOnly() {
+    const el = state.manualRenameTarget;
+    const newId = document.getElementById('manual-new-id').value.trim();
+    if (!el || !newId) return;
+    const oldId = el.id;
+    el.id = newId;
+    // !! DO NOT touch metadata - user sets it separately
+    updateLayerLabel(el, newId);
+    flashElement(el, '#6366f1');
+    document.getElementById('manual-current-id').textContent = newId;
+    document.getElementById('manual-new-id').value = '';
+    statusBar.textContent = `SVG ID: "${oldId}" → "${newId}" (Metadata ID unchanged)`;
+    relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
+    renderRelationGroups();
+}
+
+// Context right-click → Set Metadata ID: focus the input in panel
+function contextFocusMetaInput() {
+    const el = state.contextTarget;
+    if (!el) return;
+    handleSelection(el, false);
+    switchLeftTab('rename');
+    setTimeout(() => {
+        const inp = document.getElementById('meta-id-input');
+        if (inp) { inp.focus(); inp.select(); }
+    }, 120);
+}
+
+// Refresh the Manual Rename panel for a given element
+function refreshManualPanel(el) {
+    document.getElementById('manual-rename-hint').classList.add('hidden');
+    document.getElementById('manual-rename-form').classList.remove('hidden');
+
+    document.getElementById('manual-tag-badge').textContent = `<${el.tagName}>`;
+    document.getElementById('manual-current-id').textContent = el.id || '(no id)';
+
+    const parent = getParentGroup(el);
+    document.getElementById('manual-parent-id').textContent = parent ? (parent.id || `<g> (no id)`) : 'svg root';
+
+    // Current metadata
+    const curMeta = getMetadataValue(el);
+    const existDisp = document.getElementById('meta-existing-display');
+    const existVal = document.getElementById('meta-existing-val');
+    if (curMeta !== null) {
+        existDisp.classList.remove('hidden');
+        existVal.textContent = curMeta;
+    } else {
+        existDisp.classList.add('hidden');
+    }
+
+    // Used numbers in group
+    const usedSet = getUsedMetaIdsInGroup(el);
+    const usedDiv = document.getElementById('meta-used-numbers');
+    const usedList = document.getElementById('meta-used-list');
+    if (usedSet.size > 0) {
+        usedDiv.classList.remove('hidden');
+        usedList.textContent = [...usedSet].sort((a,b) => parseInt(a)-parseInt(b)).join(', ');
+    } else {
+        usedDiv.classList.add('hidden');
+    }
+
+    // Reset meta input state
+    const metaInput = document.getElementById('meta-id-input');
+    metaInput.value = '';
+    metaInput.classList.remove('meta-input-valid', 'meta-input-invalid');
+    const fb = document.getElementById('meta-id-feedback');
+    fb.textContent = '';
+    fb.className = 'text-[10px] mt-1 min-h-[14px]';
+}
+
+// =============================================================
+// DOM REFS
+// =============================================================
+const fileInput = document.getElementById('file-input');
+const underlayInput = document.getElementById('underlay-input');
+const svgContainer = document.getElementById('svg-container');
+const artboard = document.getElementById('artboard');
+const highlightBox = document.getElementById('highlight-box');
+const selectionOverlay = document.getElementById('selection-overlay');
+const contextMenu = document.getElementById('context-menu');
+const layersTree = document.getElementById('layers-tree');
+const canvasWrapper = document.getElementById('canvas-wrapper');
+const statusBar = document.getElementById('status-bar');
+const zoomDisplay = document.getElementById('zoom-level');
+const zoomSlider = document.getElementById('zoom-slider');
+const zoomResetBtn = document.getElementById('zoom-reset');
+const leftSidebar = document.getElementById('left-sidebar');
+const rightSidebar = document.getElementById('right-sidebar');
+const resizerLeft = document.getElementById('resizer-left');
+const resizerRight = document.getElementById('resizer-right');
+
+function initIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
+
+window.addEventListener('load', () => {
+    initIcons();
+    renderRelationGroups();
+    const metaInput = document.getElementById('meta-id-input');
+    metaInput.addEventListener('input', onMetaInputChange);
+    metaInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyMetaId(); });
+});
+
+// =============================================================
+// RESIZERS
+// =============================================================
+let isResizingLeft = false, isResizingRight = false;
+resizerLeft.addEventListener('mousedown', e => { isResizingLeft = true; document.body.style.cursor = 'col-resize'; resizerLeft.classList.add('resizing'); e.preventDefault(); });
+resizerRight.addEventListener('mousedown', e => { isResizingRight = true; document.body.style.cursor = 'col-resize'; resizerRight.classList.add('resizing'); e.preventDefault(); });
+document.addEventListener('mousemove', e => {
+    if (isResizingLeft) { const w = e.clientX; if (w > 200 && w < 700) leftSidebar.style.width = w + 'px'; }
+    if (isResizingRight) { const w = window.innerWidth - e.clientX; if (w > 200 && w < 600) rightSidebar.style.width = w + 'px'; }
+});
+document.addEventListener('mouseup', () => {
+    isResizingLeft = isResizingRight = false;
+    document.body.style.cursor = 'default';
+    resizerLeft.classList.remove('resizing'); resizerRight.classList.remove('resizing');
+});
+
+// =============================================================
+// TABS
+// =============================================================
+function switchLeftTab(tab) {
+    state.activeLeftTab = tab;
+    ['rename', 'relations'].forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const panel = document.getElementById(`panel-${t}`);
+        if (btn) btn.className = t === tab
+            ? 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 transition-colors'
+            : 'flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors';
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+    });
+    if (tab === 'relations') renderRelationGroups();
+}
+
+// =============================================================
+// RELATION GROUPS
+// =============================================================
+function renderRelationGroups() {
+    const container = document.getElementById('relation-groups-list');
+    if (!container) return;
+    container.innerHTML = relationGroups.map(group => `
+        <div class="border-2 ${currentRelationGroupId === group.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'} rounded-lg overflow-hidden transition-all">
+            <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50" onclick="selectRelationGroup('${group.id}')">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 ${currentRelationGroupId === group.id ? 'bg-emerald-500' : 'bg-slate-300'}"></span>
+                    <input type="text" value="${group.name}"
+                        class="text-xs font-bold bg-transparent border-none focus:ring-1 focus:ring-emerald-500 rounded px-1 flex-1 min-w-0 font-mono"
+                        onchange="renameRelationGroup('${group.id}', this.value)" onclick="event.stopPropagation()">
+                    <span class="text-[10px] text-slate-400 flex-shrink-0">${group.elements.length} items</span>
+                </div>
+                <div class="flex gap-1 flex-shrink-0 ml-2">
+                    <button onclick="event.stopPropagation(); addSelectedToRelationGroup('${group.id}')" class="p-1 text-slate-400 hover:text-emerald-600" title="Add selected">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); promptDeleteRelationGroup('${group.id}')" class="p-1 text-slate-400 hover:text-red-600" title="Delete">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                 </div>
-
-                <div class="mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-xs leading-relaxed border border-blue-100">
-                    <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
-                    Select multiple elements using <span class="font-bold">Shift+Click</span>, then click a preset to apply styles.
-                </div>
-
-                <!-- Auto Rename Tool -->
-                <div class="mt-6 pt-4 border-t border-slate-200">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <i data-lucide="text-cursor-input" class="w-3 h-3"></i> Auto-Rename
-                    </h3>
-                    <div class="bg-white border border-slate-200 rounded-lg p-3 space-y-3 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-medium text-slate-700">Enable Mode</span>
-                            <button id="btn-auto-name-toggle" onclick="toggleAutoNameMode()" class="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-200 transition-colors focus:outline-none">
-                                <span class="sr-only">Enable Auto-Naming</span>
-                                <span id="btn-auto-name-knob" class="translate-x-1 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm"></span>
+            </div>
+            <div class="px-3 pb-1">
+                <input type="text" value="${group.comment || ''}" placeholder="Add comment..."
+                    class="w-full text-[10px] text-slate-500 italic bg-transparent border-none focus:ring-1 focus:ring-emerald-300 rounded px-1 py-0.5"
+                    onchange="updateGroupComment('${group.id}', this.value)" onclick="event.stopPropagation()">
+            </div>
+            <div class="border-t border-slate-100 p-2 space-y-1 max-h-52 overflow-y-auto text-[11px]">
+                ${group.elements.length === 0
+                    ? '<div class="text-slate-400 italic text-[10px] text-center py-2">No elements. Double-click canvas element to add.</div>'
+                    : group.elements.map(el => `
+                        <div class="flex items-center gap-1 px-1 py-0.5 hover:bg-slate-100 rounded cursor-pointer group/item" onclick="selectElementById('${el.id}')">
+                            <span class="text-slate-400 text-[10px]">(</span>
+                            <span class="font-mono text-slate-700 flex-1 truncate">${el.id || el.tagName}</span>
+                            ${el.metaId ? `<span class="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 text-[10px] px-1 rounded">#${el.metaId}</span>` : '<span class="text-slate-300 text-[9px] italic">no meta</span>'}
+                            ${el.target ? `<span class="font-mono text-blue-500 text-[10px] truncate max-w-[50px]">${el.target}</span>` : ''}
+                            <span class="text-slate-400 text-[10px]">)</span>
+                            <button onclick="event.stopPropagation(); promptSetTarget('${group.id}', '${el.id}')" class="ml-1 text-slate-300 hover:text-blue-500 opacity-0 group-hover/item:opacity-100 flex-shrink-0" title="Set target">
+                                <i data-lucide="link" class="w-3 h-3"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); removeFromRelationGroup('${group.id}', '${el.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100 flex-shrink-0" title="Remove">
+                                <i data-lucide="x" class="w-3 h-3"></i>
                             </button>
                         </div>
-                        <div id="auto-name-controls" class="space-y-2 opacity-50 pointer-events-none transition-opacity">
-                            <div class="flex gap-2">
-                                <div class="flex-1">
-                                    <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Prefix</label>
-                                    <input type="text" id="input-auto-prefix" value="Light " class="w-full text-xs border border-slate-200 rounded px-2 py-1.5 outline-none focus:border-indigo-500 transition-colors" oninput="state.autoNaming.prefix = this.value">
-                                </div>
-                                <div class="w-16">
-                                    <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Start #</label>
-                                    <input type="number" id="input-auto-counter" value="1" min="0" class="w-full text-xs border border-slate-200 rounded px-2 py-1.5 outline-none focus:border-indigo-500 transition-colors" oninput="state.autoNaming.counter = parseInt(this.value)">
-                                </div>
-                            </div>
-                            <div class="text-[10px] text-slate-400 italic leading-snug pt-1">
-                                <i data-lucide="mouse-pointer-click" class="w-3 h-3 inline mr-0.5"></i>
-                                Click elements on canvas to sequentially rename them (e.g., Light 1, Light 2...)
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Properties Panel -->
-            <div id="panel-props" class="flex-1 overflow-y-auto hidden bg-white">
-                <div id="inspector-content" class="p-4 space-y-6">
-                    <div class="text-slate-400 text-sm text-center mt-10 italic">
-                        Select an element to view properties.
-                    </div>
-                </div>
-            </div>
-
-            <!-- Relations Panel -->
-            <div id="panel-relations" class="flex-1 overflow-y-auto hidden bg-white p-4">
-                <div class="mb-4">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center justify-between">
-                        <span>Relation Groups</span>
-                        <button onclick="createNewRelationGroup()" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded transition-colors flex items-center gap-1">
-                            <i data-lucide="plus" class="w-3 h-3"></i> New Group
-                        </button>
-                    </h3>
-                    
-                    <div class="text-xs text-slate-500 mb-3 p-2 bg-blue-50 rounded-lg">
-                        <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
-                        <strong>Double-click</strong> or <strong>Long-press (500ms)</strong> on any element to add it to selected relation group.
-                    </div>
-                    
-                    <div id="relation-groups-list" class="space-y-3">
-                        <!-- Dynamic relation groups will appear here -->
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- LEFT RESIZER -->
-        <div id="resizer-left" class="resizer"></div>
-
-        <!-- CENTER: Canvas Area -->
-        <section class="flex-1 relative flex flex-col min-w-0 bg-slate-100">
-            <!-- Toolbar -->
-            <div class="bg-white border-b border-slate-200 px-4 py-1 flex items-center justify-between text-xs text-slate-500 h-10 shadow-sm z-10 shrink-0">
-                <div id="status-bar" class="truncate max-w-[50%]">No file loaded</div>
-                <div class="flex gap-2 items-center bg-slate-50 rounded border border-slate-200 p-1">
-                    <span class="text-[10px] uppercase font-bold text-slate-400 px-2 hidden sm:inline">
-                        <span id="multi-select-hint">Hold Shift to Multi-Select</span>
-                    </span>
-                    <div class="w-px h-4 bg-slate-200 mx-1"></div>
-                    <i data-lucide="zoom-in" class="w-3 h-3 text-slate-400"></i>
-                    <input type="range" id="zoom-slider" min="10" max="500" value="100" class="w-24 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
-                    <span id="zoom-level" class="px-1 min-w-[3rem] text-center font-mono">100%</span>
-                    <button id="zoom-reset" class="p-1 hover:bg-slate-200 rounded" title="Reset Zoom">
-                        <i data-lucide="maximize" class="w-3 h-3"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- SVG Container Wrapper -->
-            <div id="canvas-wrapper" class="flex-1 overflow-auto relative bg-slate-200/50 p-8 cursor-crosshair">
-                <!-- White artboard shadow container -->
-                <div class="shadow-xl bg-white checkerboard relative mx-auto min-h-[500px] min-w-[500px] origin-top-left ease-out" id="artboard">
-                    <div id="svg-container" class="w-full h-full">
-                        <!-- Content injected here -->
-                    </div>
-                    
-                    <!-- Empty State -->
-                    <div id="empty-state" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div class="text-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/80">
-                            <i data-lucide="layout-template" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
-                            <p class="text-slate-500 text-sm font-medium">Drag & drop Floor Plan SVG</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Overlays -->
-                <div id="highlight-box"></div>
-                <div id="selection-overlay"></div>
-            </div>
-        </section>
-
-        <!-- RIGHT RESIZER -->
-        <div id="resizer-right" class="resizer"></div>
-
-        <!-- RIGHT SIDEBAR: Layers -->
-        <aside id="right-sidebar" class="w-80 bg-white border-l border-slate-200 flex flex-col shadow-xl z-20 shrink-0" style="width: 320px;">
-            <div class="flex items-center justify-between border-b border-slate-200 p-3 bg-slate-50 shrink-0">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Layers</span>
-                <button onclick="collapseAll()" class="text-[10px] text-blue-600 hover:underline px-2 cursor-pointer flex items-center gap-1">
-                    <i data-lucide="chevrons-right" class="w-3 h-3"></i> Collapse All
-                </button>
-            </div>
-
-            <!-- Layers Tree -->
-            <div id="panel-layers" class="flex-1 overflow-y-auto flex flex-col bg-white">
-                <div id="layers-tree" class="flex-1 text-sm font-medium select-none pb-10">
-                    <div class="p-8 text-center text-slate-400 text-xs italic">No layers</div>
-                </div>
-            </div>
-        </aside>
-
-    </main>
-
-    <!-- Context Menu -->
-    <div id="context-menu">
-        <div class="menu-item" onclick="selectSimilar()">
-            <i data-lucide="copy" class="w-4 h-4"></i>
-            Select Similar
-        </div>
-        <div class="menu-divider"></div>
-        <div class="menu-item" onclick="addToSelectedRelation()">
-            <i data-lucide="link-2" class="w-4 h-4"></i>
-            Add to Relation
-        </div>
-        <div class="menu-divider"></div>
-        <div class="menu-item" onclick="deleteSelected()">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-            Delete
-        </div>
-    </div>
-
-    <!-- Underlay Modal -->
-    <div id="underlay-modal" class="fixed top-16 right-4 z-50 bg-white rounded-lg shadow-xl border border-slate-200 w-64 p-4 hidden animate-fade-in">
-        <div class="flex justify-between items-center mb-3">
-            <h3 class="font-bold text-sm text-slate-700">Image Underlay</h3>
-            <button onclick="document.getElementById('underlay-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
-        </div>
-        <div class="space-y-3">
-            <div>
-                <label class="text-xs text-slate-500 font-medium mb-1 block">Opacity</label>
-                <input type="range" id="underlay-opacity" min="0" max="1" step="0.05" value="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateUnderlayOpacity(this.value)">
-            </div>
-            <div class="flex justify-between text-xs text-slate-400">
-                <span>0%</span>
-                <span>100%</span>
-            </div>
-             <button onclick="removeUnderlay()" class="w-full py-1.5 text-xs text-red-600 border border-red-200 hover:bg-red-50 rounded mt-2">Remove Image</button>
-        </div>
-    </div>
-
-    <!-- Confirm Modal -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-[110] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl w-72 p-6 text-center transform transition-all scale-100">
-            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                <i data-lucide="trash-2" class="w-6 h-6"></i>
-            </div>
-            <h3 class="text-lg font-bold text-slate-800 mb-2">Delete Preset?</h3>
-            <p class="text-xs text-slate-500 mb-6">Are you sure you want to remove this style preset? This action cannot be undone.</p>
-            <div class="flex gap-2 justify-center">
-                <button onclick="toggleConfirmModal(false)" class="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
-                <button onclick="executeDelete()" class="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors">Yes, Delete</button>
+                    `).join('')}
             </div>
         </div>
-    </div>
+    `).join('');
+    initIcons();
+    updateRelationSVGPreview();
+}
 
-    <!-- Preset Editor Modal -->
-    <div id="preset-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl w-80 p-5 transform transition-all scale-100">
-            <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-600"></i>
-                <span id="modal-title">Edit Preset</span>
-            </h3>
-            <div class="space-y-3">
-                <input type="hidden" id="preset-index">
-                <div>
-                    <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Name</label>
-                    <input type="text" id="preset-name" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Fill Color</label>
-                    <div class="flex gap-2">
-                        <div class="relative w-8 h-8 rounded border border-slate-300 shadow-sm checkerboard overflow-hidden flex-shrink-0">
-                            <input type="color" id="preset-fill-picker" class="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer opacity-0 z-10" oninput="document.getElementById('preset-fill').value = this.value; document.getElementById('preset-fill-preview').style.backgroundColor = this.value">
-                            <div class="w-full h-full" id="preset-fill-preview"></div>
-                        </div>
-                        <input type="text" id="preset-fill" placeholder="none" class="flex-1 text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none" onchange="document.getElementById('preset-fill-preview').style.backgroundColor = this.value">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Stroke Color</label>
-                    <div class="flex gap-2">
-                        <div class="relative w-8 h-8 rounded border border-slate-300 shadow-sm overflow-hidden flex-shrink-0">
-                            <input type="color" id="preset-stroke-picker" class="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer opacity-0 z-10" oninput="document.getElementById('preset-stroke').value = this.value; document.getElementById('preset-stroke-preview').style.borderColor = this.value">
-                            <div class="absolute inset-2 border-2" id="preset-stroke-preview"></div>
-                        </div>
-                        <input type="text" id="preset-stroke" placeholder="none" class="flex-1 text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none" onchange="document.getElementById('preset-stroke-preview').style.borderColor = this.value">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Width (px)</label>
-                        <input type="text" id="preset-width" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Opacity (0-1)</label>
-                        <input type="number" id="preset-opacity" step="0.1" min="0" max="1" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                </div>
-            </div>
-            <div class="mt-5 flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button onclick="closePresetModal()" class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded">Cancel</button>
-                <button onclick="savePreset()" class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded shadow-sm">Save Preset</button>
-            </div>
-        </div>
-    </div>
+function updateGroupComment(groupId, comment) {
+    const g = relationGroups.find(g => g.id === groupId);
+    if (g) { g.comment = comment; updateRelationSVGPreview(); }
+}
 
-    <script>
-        // --- Data ---
-        let presets = [
-            { name: 'Outer Wall', icon: 'brick-wall', style: { fill: '#334155', stroke: '#0f172a', strokeWidth: '4px', opacity: '1' } },
-            { name: 'Inner Partition', icon: 'rectangle-horizontal', style: { fill: '#94a3b8', stroke: '#475569', strokeWidth: '2px', opacity: '1' } },
-            { name: 'Furniture', icon: 'sofa', style: { fill: '#e0e7ff', stroke: '#4f46e5', strokeWidth: '1px', opacity: '1' } },
-            { name: 'Doors/Windows', icon: 'door-open', style: { fill: 'none', stroke: '#ef4444', strokeWidth: '2px', opacity: '1' } },
-            { name: 'Electrical', icon: 'zap', style: { fill: '#fef08a', stroke: '#eab308', strokeWidth: '1px', opacity: '1' } },
-            { name: 'Plumbing', icon: 'droplets', style: { fill: '#bae6fd', stroke: '#0ea5e9', strokeWidth: '1px', opacity: '1'} }
-        ];
+function promptSetTarget(groupId, elementId) {
+    const group = relationGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const el = group.elements.find(e => e.id === elementId);
+    if (!el) return;
+    const target = prompt(`Set target for (${elementId}):`, el.target || '');
+    if (target !== null) { el.target = target.trim(); renderRelationGroups(); }
+}
 
-        // --- Relation Data ---
-        let relationGroups = [
-            { id: 'Relation', name: 'Main Relation', elements: [] }
-        ];
-        let currentRelationGroupId = 'Relation';
+function selectRelationGroup(groupId) {
+    currentRelationGroupId = groupId;
+    renderRelationGroups();
+    statusBar.textContent = `Active relation: "${relationGroups.find(g => g.id === groupId)?.name}"`;
+}
 
-        // --- State ---
-        const state = {
-            scale: 1,
-            svgLoaded: false,
-            selectedElements: new Set(),
-            activeLeftTab: 'presets',
-            nodeMap: new Map(),
-            contextTarget: null,
-            underlayImg: null,
-            draggedLayer: null,
-            autoNaming: {
-                active: false,
-                prefix: 'Light ',
-                counter: 1
-            },
-            longPressTimeout: null,
-            isLongPressing: false
+function renameRelationGroup(groupId, newName) {
+    const g = relationGroups.find(g => g.id === groupId);
+    if (g) {
+        if (currentRelationGroupId === groupId) currentRelationGroupId = newName;
+        g.id = newName; g.name = newName; renderRelationGroups();
+        statusBar.textContent = `Group renamed to "${newName}"`;
+    }
+}
+
+function createNewRelationGroup() {
+    const newId = `Relation_${Date.now()}`;
+    const newName = `Relation ${relationGroups.length + 1}`;
+    relationGroups.push({ id: newId, name: newName, elements: [], comment: '' });
+    currentRelationGroupId = newId; renderRelationGroups();
+}
+
+function promptDeleteRelationGroup(groupId) {
+    if (relationGroups.length === 1) { alert('Cannot delete the last group.'); return; }
+    showConfirmModal('Delete Relation Group', 'This cannot be undone.', () => {
+        relationGroups = relationGroups.filter(g => g.id !== groupId);
+        if (currentRelationGroupId === groupId) currentRelationGroupId = relationGroups[0]?.id || null;
+        renderRelationGroups();
+    });
+}
+
+function addElementToRelationGroup(element, groupId) {
+    const group = relationGroups.find(g => g.id === groupId);
+    if (!group) return false;
+    const elId = element.id || `${element.tagName}_${Date.now()}`;
+    if (!element.id) element.id = elId;
+    if (group.elements.some(el => el.id === elId)) { statusBar.textContent = `"${elId}" already in group`; return false; }
+    const metaVal = getMetadataValue(element);
+    group.elements.push({ id: elId, tagName: element.tagName, target: '', metaId: metaVal || '' });
+    renderRelationGroups();
+    element.classList.add('relation-flash');
+    setTimeout(() => element.classList.remove('relation-flash'), 500);
+    statusBar.textContent = `Added "${elId}" to ${group.name}`;
+    return true;
+}
+
+function addSelectedToRelationGroup(groupId) {
+    if (state.selectedElements.size === 0) { alert('Select elements on canvas first.'); return; }
+    state.selectedElements.forEach(el => addElementToRelationGroup(el, groupId));
+}
+
+function addContextTargetToRelation() {
+    if (state.contextTarget) addElementToRelationGroup(state.contextTarget, currentRelationGroupId);
+}
+
+function removeFromRelationGroup(groupId, elementId) {
+    const g = relationGroups.find(g => g.id === groupId);
+    if (g) { g.elements = g.elements.filter(el => el.id !== elementId); renderRelationGroups(); }
+}
+
+function selectElementById(elementId) {
+    const svg = svgContainer.querySelector('svg');
+    if (!svg) return;
+    const el = svg.querySelector(`[id="${elementId}"]`);
+    if (el) {
+        handleSelection(el, false);
+        const box = getTransformedBox(el);
+        canvasWrapper.scrollTo({ left: box.left - 100, top: box.top - 100, behavior: 'smooth' });
+    }
+}
+
+function buildRelationSVGText() {
+    return relationGroups.map(group => {
+        const commentLine = group.comment ? `\n    <!-- ${group.comment} -->` : '';
+        const items = group.elements.map(el => {
+            const meta = el.metaId ? `[${el.metaId}]` : '';
+            const target = el.target ? ` ${el.target}` : '';
+            return `    (${el.id}${meta}${target})`;
+        }).join('\n');
+        return `<g id="${group.name}">${commentLine}\n${items || '    <!-- empty -->'}\n</g>`;
+    }).join('\n\n');
+}
+
+function updateRelationSVGPreview() {
+    const preview = document.getElementById('relation-svg-preview');
+    if (preview) preview.textContent = buildRelationSVGText();
+}
+
+function copyRelationSVG() {
+    navigator.clipboard.writeText(buildRelationSVGText()).then(() => { statusBar.textContent = 'Relation SVG copied!'; });
+}
+
+// =============================================================
+// LONG PRESS & DOUBLE CLICK
+// =============================================================
+function handleDoubleClickForRelation(element) {
+    if (state.autoNaming.active) return;
+    addElementToRelationGroup(element, currentRelationGroupId);
+}
+function startLongPress(element) {
+    state.longPressTimeout = setTimeout(() => {
+        state.isLongPressing = true;
+        if (!state.autoNaming.active) handleDoubleClickForRelation(element);
+    }, 500);
+}
+function cancelLongPress() {
+    if (state.longPressTimeout) { clearTimeout(state.longPressTimeout); state.longPressTimeout = null; }
+    state.isLongPressing = false;
+}
+
+// =============================================================
+// SELECTION RESOLVER
+// =============================================================
+function resolveSelectTarget(rawTarget, svgRoot) {
+    if (!rawTarget || rawTarget === svgRoot) return null;
+    let el = rawTarget;
+    while (el && el !== svgRoot) {
+        if (el.nodeType === 1 && el.tagName !== 'metadata' && el.tagName !== 'title' &&
+            el.tagName !== 'desc' && el.tagName !== 'defs' && el.tagName !== 'style') {
+            if (el.id && el.id.trim() !== '') return el;
+        }
+        el = el.parentElement;
+    }
+    el = rawTarget;
+    while (el && el !== svgRoot) { if (el.tagName === 'g') return el; el = el.parentElement; }
+    if (rawTarget.nodeType === 1 && rawTarget !== svgRoot &&
+        rawTarget.tagName !== 'metadata' && rawTarget.tagName !== 'title' && rawTarget.tagName !== 'desc') return rawTarget;
+    return null;
+}
+
+// =============================================================
+// AUTO RENAME — NEVER touches metadata
+// =============================================================
+function toggleAutoNameMode() {
+    state.autoNaming.active = !state.autoNaming.active;
+    const knob = document.getElementById('btn-auto-name-knob');
+    const bg = document.getElementById('btn-auto-name-toggle');
+    const controls = document.getElementById('auto-name-controls');
+    if (state.autoNaming.active) {
+        knob.classList.add('translate-x-5'); bg.classList.replace('bg-slate-200', 'bg-indigo-600');
+        controls.classList.remove('opacity-50', 'pointer-events-none');
+        deselectAll(); document.body.style.cursor = 'alias';
+        statusBar.textContent = 'Auto-Rename ON — sirf SVG ID set hoga';
+    } else {
+        knob.classList.remove('translate-x-5'); bg.classList.replace('bg-indigo-600', 'bg-slate-200');
+        controls.classList.add('opacity-50', 'pointer-events-none');
+        document.body.style.cursor = 'default';
+        statusBar.textContent = 'Auto-Rename OFF';
+    }
+}
+
+function applyAutoName(el) {
+    const oldId = el.id;
+    const newId = `${state.autoNaming.prefix}${state.autoNaming.counter}`;
+    el.id = newId;
+    // !! NEVER touch metadata — user sets it
+    state.autoNaming.counter++;
+    document.getElementById('input-auto-counter').value = state.autoNaming.counter;
+    updateLayerLabel(el, newId);
+    flashElement(el, '#6366f1');
+    statusBar.textContent = `SVG ID → "${newId}" (Metadata ID nahi baala — manually set karo)`;
+}
+
+// =============================================================
+// BULK RENAME — NEVER touches metadata
+// =============================================================
+function applyBulkRename() {
+    const findStr = document.getElementById('bulk-find').value.trim();
+    const replaceStr = document.getElementById('bulk-replace').value.trim();
+    if (!findStr) return;
+    const svg = svgContainer.querySelector('svg');
+    if (!svg) return;
+    let count = 0;
+    svg.querySelectorAll('[id]').forEach(el => {
+        if (el.id.includes(findStr)) {
+            const oldId = el.id;
+            const newId = el.id.replaceAll(findStr, replaceStr);
+            el.id = newId;
+            // !! NEVER touch metadata
+            relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
+            updateLayerLabel(el, newId);
+            count++;
+        }
+    });
+    const resultEl = document.getElementById('bulk-rename-result');
+    resultEl.textContent = `${count} SVG ID(s) renamed. Metadata IDs unchanged.`;
+    resultEl.classList.remove('hidden');
+    setTimeout(() => resultEl.classList.add('hidden'), 3000);
+    renderRelationGroups();
+    statusBar.textContent = `Bulk: ${count} SVG ID(s) renamed`;
+}
+
+function renameContextTarget() {
+    if (!state.contextTarget) return;
+    const el = state.contextTarget;
+    const oldId = el.id || '';
+    const newId = prompt('Enter new SVG ID:', oldId);
+    if (newId !== null && newId.trim() && newId !== oldId) {
+        el.id = newId.trim();
+        // !! NEVER touch metadata
+        updateLayerLabel(el, newId.trim());
+        flashElement(el, '#3b82f6');
+        statusBar.textContent = `SVG ID "${oldId}" → "${newId.trim()}" (Metadata unchanged)`;
+        relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId.trim(); }));
+        renderRelationGroups();
+    }
+}
+
+function updateLayerLabel(el, newId) {
+    const treeId = state.nodeMap.get(el);
+    if (treeId) {
+        const label = document.querySelector(`#${treeId} .layer-label`);
+        if (label) {
+            label.textContent = newId;
+            label.classList.add('text-indigo-600', 'font-bold');
+            setTimeout(() => label.classList.remove('text-indigo-600', 'font-bold'), 500);
+        }
+    }
+}
+
+function flashElement(el, color) {
+    const orig = el.style.outline;
+    el.style.outline = `3px solid ${color}`;
+    setTimeout(() => el.style.outline = orig, 300);
+}
+
+// =============================================================
+// CONTEXT MENU
+// =============================================================
+canvasWrapper.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const target = e.target;
+    if (svgContainer.contains(target) && target.tagName !== 'svg') {
+        state.contextTarget = target;
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.top = `${e.clientY}px`;
+        if (!state.selectedElements.has(target)) handleSelection(target, false);
+    } else {
+        state.contextTarget = null;
+        contextMenu.style.display = 'none';
+    }
+});
+document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+function selectSimilar() {
+    if (!state.contextTarget) return;
+    const source = state.contextTarget;
+    const computed = window.getComputedStyle(source);
+    const sourceFill = computed.fill, sourceStroke = computed.stroke, tagName = source.tagName;
+    const svg = svgContainer.querySelector('svg');
+    let count = 0;
+    svg.querySelectorAll(tagName).forEach(el => {
+        const s = window.getComputedStyle(el);
+        if (s.fill === sourceFill && s.stroke === sourceStroke) { state.selectedElements.add(el); count++; }
+    });
+    updateSelectionVisuals();
+    statusBar.textContent = `Selected ${count} similar items`;
+}
+
+function deleteSelected() {
+    if (state.selectedElements.size > 0) {
+        showConfirmModal('Delete Elements', `Delete ${state.selectedElements.size} item(s)?`, () => {
+            state.selectedElements.forEach(el => el.remove());
+            deselectAll();
+            rebuildLayersTree(svgContainer.querySelector('svg'));
+        });
+    }
+}
+
+// =============================================================
+// CONFIRM MODAL
+// =============================================================
+function showConfirmModal(title, message, callback) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    state.confirmCallback = callback;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+}
+function closeConfirmModal() { document.getElementById('confirm-modal').classList.add('hidden'); state.confirmCallback = null; }
+function executeConfirm() { if (state.confirmCallback) state.confirmCallback(); closeConfirmModal(); }
+
+// =============================================================
+// UNDERLAY
+// =============================================================
+underlayInput.addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+        const svg = svgContainer.querySelector('svg');
+        if (!svg) { alert('Load SVG first.'); underlayInput.value = ''; return; }
+        const existing = svg.querySelector('#underlay-img'); if (existing) existing.remove();
+        const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+        img.id = 'underlay-img'; img.setAttribute('href', evt.target.result);
+        let x = 0, y = 0, w = 1000, h = 1000;
+        if (svg.viewBox?.baseVal?.width > 0) { x = svg.viewBox.baseVal.x; y = svg.viewBox.baseVal.y; w = svg.viewBox.baseVal.width; h = svg.viewBox.baseVal.height; }
+        img.setAttribute('width', w); img.setAttribute('height', h); img.setAttribute('x', x); img.setAttribute('y', y);
+        img.setAttribute('opacity', '0.5'); img.style.pointerEvents = 'none'; img.setAttribute('preserveAspectRatio', 'none');
+        state.underlayImg = img;
+        if (svg.firstChild) svg.insertBefore(img, svg.firstChild); else svg.appendChild(img);
+        underlayInput.value = '';
+        document.getElementById('underlay-modal').classList.remove('hidden');
+        document.getElementById('underlay-opacity').value = 0.5;
+        statusBar.textContent = 'Underlay added';
+    };
+    reader.readAsDataURL(file);
+});
+function updateUnderlayOpacity(val) { if (state.underlayImg) state.underlayImg.setAttribute('opacity', val); }
+function removeUnderlay() {
+    if (state.underlayImg) { state.underlayImg.remove(); state.underlayImg = null; document.getElementById('underlay-modal').classList.add('hidden'); }
+}
+
+// =============================================================
+// EXPORT
+// =============================================================
+function toggleExportMenu(force) {
+    const menu = document.getElementById('export-menu');
+    if (force !== undefined) menu.classList.toggle('hidden', !force); else menu.classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+    if (!e.target.closest('#export-btn') && !e.target.closest('#export-menu')) toggleExportMenu(false);
+});
+
+function prepareSVGForExport() {
+    if (!state.svgLoaded) { alert('No SVG loaded.'); return null; }
+    const originalSvg = svgContainer.querySelector('svg');
+    const clone = originalSvg.cloneNode(true);
+    clone.style.transform = ''; clone.style.transformOrigin = ''; clone.style.transition = '';
+    const underlay = clone.querySelector('image#underlay-img'); if (underlay) underlay.remove();
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(clone);
+    if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+        source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    if (relationGroups.some(g => g.elements.length > 0)) {
+        const relBlocks = relationGroups.filter(g => g.elements.length > 0).map(group => {
+            const commentLine = group.comment ? `\n    <!-- ${group.comment} -->` : '';
+            const items = group.elements.map(el => {
+                const meta = el.metaId ? `[${el.metaId}]` : '';
+                const target = el.target ? ` ${el.target}` : '';
+                return `    (${el.id}${meta}${target})`;
+            }).join('\n');
+            return `\n<g id="${group.name}">${commentLine}\n\n${items}\n\n</g>`;
+        }).join('\n');
+        source = source.replace(/<\/svg>\s*$/, relBlocks + '\n</svg>');
+    }
+    return source;
+}
+
+function handleExport(type) {
+    const source = prepareSVGForExport(); if (!source) return;
+    if (type === 'download') {
+        const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; link.download = `floorplan_${Date.now()}.svg`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } else if (type === 'copy') {
+        navigator.clipboard.writeText(source).then(() => statusBar.textContent = 'SVG copied!');
+    } else if (type === 'css') {
+        const encoded = encodeURIComponent(source).replace(/'/g, '%27').replace(/"/g, '%22');
+        navigator.clipboard.writeText(`url("data:image/svg+xml;charset=utf-8,${encoded}")`).then(() => statusBar.textContent = 'CSS URI copied!');
+    }
+    toggleExportMenu(false);
+}
+
+// =============================================================
+// FILE LOADING
+// =============================================================
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length && e.dataTransfer.files[0].type === 'image/svg+xml') loadFile(e.dataTransfer.files[0]);
+    else alert('Drop a valid SVG file.');
+});
+
+function loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        if (!e.target.result.includes('<svg')) { alert('Invalid SVG.'); return; }
+        svgContainer.innerHTML = e.target.result;
+        document.getElementById('empty-state').style.display = 'none';
+        state.svgLoaded = true; state.scale = 1;
+        state.selectedElements.clear(); state.nodeMap.clear();
+        const svg = svgContainer.querySelector('svg');
+        if (svg) {
+            svg.style.width = '100%'; svg.style.height = '100%'; svg.style.overflow = 'visible';
+            const vb = svg.viewBox.baseVal;
+            if (vb && vb.width > 0) { artboard.style.width = vb.width + 'px'; artboard.style.height = vb.height + 'px'; }
+            attachSVGListeners(svg); rebuildLayersTree(svg);
+            statusBar.textContent = `${file.name} loaded`;
+            zoomSlider.value = 100; zoomDisplay.textContent = '100%';
+        }
+    };
+    reader.readAsText(file);
+}
+
+// =============================================================
+// SVG INTERACTION
+// =============================================================
+function attachSVGListeners(svgElement) {
+    svgElement.addEventListener('mouseover', e => {
+        const t = resolveSelectTarget(e.target, svgElement); if (t) highlightElement(t);
+    });
+    svgElement.addEventListener('mouseout', () => hideHighlight());
+    svgElement.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        const t = resolveSelectTarget(e.target, svgElement);
+        if (t && !state.autoNaming.active) handleDoubleClickForRelation(t);
+    });
+    svgElement.addEventListener('mousedown', e => {
+        const t = resolveSelectTarget(e.target, svgElement);
+        if (t && !state.autoNaming.active) startLongPress(t);
+    });
+    svgElement.addEventListener('mouseup', () => cancelLongPress());
+    svgElement.addEventListener('mouseleave', () => cancelLongPress());
+    svgElement.addEventListener('click', e => {
+        e.stopPropagation(); e.preventDefault(); cancelLongPress();
+        const t = resolveSelectTarget(e.target, svgElement);
+        if (!t) { deselectAll(); return; }
+        if (state.autoNaming.active) { applyAutoName(t); handleSelection(t, false); return; }
+        handleSelection(t, e.shiftKey || e.ctrlKey);
+    });
+    canvasWrapper.addEventListener('click', e => {
+        if (e.target === canvasWrapper || e.target === artboard) deselectAll();
+    });
+}
+
+function getTransformedBox(element) {
+    const rect = element.getBoundingClientRect();
+    const wrapperRect = canvasWrapper.getBoundingClientRect();
+    return { top: rect.top - wrapperRect.top + canvasWrapper.scrollTop, left: rect.left - wrapperRect.left + canvasWrapper.scrollLeft, width: rect.width, height: rect.height };
+}
+
+function highlightElement(el) {
+    const box = getTransformedBox(el);
+    highlightBox.style.display = 'block';
+    highlightBox.style.top = `${box.top}px`; highlightBox.style.left = `${box.left}px`;
+    highlightBox.style.width = `${box.width}px`; highlightBox.style.height = `${box.height}px`;
+    const metaVal = getMetadataValue(el);
+    statusBar.textContent = `Hover: <${el.tagName}>${el.id ? ' #' + el.id : ''}${metaVal ? ' [meta:' + metaVal + ']' : ''}`;
+}
+function hideHighlight() { highlightBox.style.display = 'none'; }
+
+function handleSelection(el, isMultiSelect) {
+    if (isMultiSelect) { state.selectedElements.has(el) ? state.selectedElements.delete(el) : state.selectedElements.add(el); }
+    else { state.selectedElements.clear(); state.selectedElements.add(el); }
+    updateSelectionVisuals();
+    if (state.selectedElements.size === 1) {
+        state.manualRenameTarget = el;
+        refreshManualPanel(el);
+    }
+}
+
+function deselectAll() {
+    state.selectedElements.clear(); state.manualRenameTarget = null;
+    updateSelectionVisuals();
+    document.getElementById('manual-rename-hint').classList.remove('hidden');
+    document.getElementById('manual-rename-form').classList.add('hidden');
+}
+
+function updateSelectionVisuals() {
+    selectionOverlay.innerHTML = '';
+    document.querySelectorAll('.layer-item').forEach(item => item.classList.remove('active-layer'));
+    state.selectedElements.forEach(el => {
+        const box = getTransformedBox(el);
+        const div = document.createElement('div');
+        div.className = 'selection-box';
+        div.style.top = `${box.top}px`; div.style.left = `${box.left}px`;
+        div.style.width = `${box.width}px`; div.style.height = `${box.height}px`;
+        selectionOverlay.appendChild(div);
+        const treeId = state.nodeMap.get(el);
+        if (treeId) {
+            const treeItem = document.getElementById(treeId);
+            if (treeItem) {
+                treeItem.classList.add('active-layer');
+                if (state.selectedElements.size === 1) { revealInTree(treeItem); treeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+            }
+        }
+    });
+    if (state.selectedElements.size !== 1) statusBar.textContent = `${state.selectedElements.size} object(s) selected`;
+}
+
+function revealInTree(rowElement) {
+    let current = rowElement.parentElement;
+    while (current && current.id !== 'layers-tree') {
+        if (current.classList.contains('tree-children-container') && current.classList.contains('hidden')) {
+            current.classList.remove('hidden');
+            const parentRow = current.parentElement?.querySelector('.layer-item');
+            if (parentRow) {
+                const toggleBtn = parentRow.querySelector('.tree-toggle-btn');
+                if (toggleBtn) { toggleBtn.innerHTML = `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>`; initIcons(); }
+            }
+        }
+        current = current.parentElement;
+    }
+}
+
+// =============================================================
+// LAYERS TREE
+// =============================================================
+function collapseAll() {
+    document.querySelectorAll('.tree-toggle-btn').forEach(btn => btn.innerHTML = `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`);
+    document.querySelectorAll('.tree-children-container').forEach(div => div.classList.add('hidden'));
+    initIcons();
+}
+
+function rebuildLayersTree(rootSvg) {
+    layersTree.innerHTML = '';
+    let idCounter = 0;
+    const SKIP_TAGS = new Set(['metadata','title','desc','defs','style','script','linearGradient','radialGradient','pattern','filter','mask','clipPath','marker','symbol','animate','animateTransform','set']);
+
+    function createTreeItem(node, depth = 0) {
+        if (node.nodeType !== 1) return null;
+        if (SKIP_TAGS.has(node.tagName)) return null;
+        const nodeId = `tree-node-${idCounter++}`;
+        state.nodeMap.set(node, nodeId);
+        const container = document.createElement('div');
+        const row = document.createElement('div');
+        row.className = 'layer-item flex items-center py-1.5 px-2 border-b border-slate-100 cursor-pointer group';
+        row.style.paddingLeft = `${(depth * 12) + 4}px`;
+        row.id = nodeId; row.setAttribute('draggable', 'true'); row.svgNode = node;
+        row.addEventListener('dragstart', onLayerDragStart);
+        row.addEventListener('dragover', onLayerDragOver);
+        row.addEventListener('dragleave', onLayerDragLeave);
+        row.addEventListener('drop', onLayerDrop);
+
+        const children = Array.from(node.children).filter(c => c.nodeType === 1 && !SKIP_TAGS.has(c.tagName));
+        const hasChildren = children.length > 0;
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'text-slate-400 hover:text-slate-600 w-5 h-5 flex items-center justify-center mr-1 tree-toggle-btn';
+        if (hasChildren) {
+            const isExpanded = depth === 0;
+            toggleBtn.innerHTML = isExpanded ? `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>` : `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`;
+            toggleBtn.onclick = e => {
+                e.stopPropagation();
+                const cc = container.querySelector('.tree-children-container');
+                if (cc) {
+                    const hidden = cc.classList.contains('hidden');
+                    if (hidden) { cc.classList.remove('hidden'); toggleBtn.innerHTML = `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>`; }
+                    else { cc.classList.add('hidden'); toggleBtn.innerHTML = `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`; }
+                    initIcons();
+                }
+            };
+        } else { toggleBtn.innerHTML = `<span class="w-3.5 h-3.5"></span>`; toggleBtn.style.pointerEvents = 'none'; }
+
+        const eyeBtn = document.createElement('button');
+        eyeBtn.className = 'text-slate-400 hover:text-slate-600 mr-2 flex-shrink-0';
+        eyeBtn.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i>`;
+        eyeBtn.onclick = e => {
+            e.stopPropagation();
+            const isHidden = node.style.visibility === 'hidden';
+            node.style.visibility = isHidden ? 'visible' : 'hidden';
+            eyeBtn.innerHTML = isHidden ? `<i data-lucide="eye" class="w-3.5 h-3.5"></i>` : `<i data-lucide="eye-off" class="w-3.5 h-3.5 text-slate-300"></i>`;
+            initIcons();
         };
 
-        // --- DOM Elements ---
-        const fileInput = document.getElementById('file-input');
-        const underlayInput = document.getElementById('underlay-input');
-        const svgContainer = document.getElementById('svg-container');
-        const artboard = document.getElementById('artboard');
-        const highlightBox = document.getElementById('highlight-box');
-        const selectionOverlay = document.getElementById('selection-overlay');
-        const contextMenu = document.getElementById('context-menu');
-        const underlayModal = document.getElementById('underlay-modal');
-        const layersTree = document.getElementById('layers-tree');
-        const canvasWrapper = document.getElementById('canvas-wrapper');
-        const statusBar = document.getElementById('status-bar');
-        const zoomDisplay = document.getElementById('zoom-level');
-        const presetsList = document.getElementById('presets-list');
-        const presetModal = document.getElementById('preset-modal');
-        const inspectorContent = document.getElementById('inspector-content');
-        
-        // --- Zoom Controls ---
-        const zoomSlider = document.getElementById('zoom-slider');
-        const zoomResetBtn = document.getElementById('zoom-reset');
+        const iconWrapper = document.createElement('span');
+        iconWrapper.className = 'mr-1.5 text-slate-400 flex-shrink-0';
+        let iconName = 'square';
+        if (node.tagName === 'g' || node.tagName === 'svg') iconName = 'folder';
+        else if (node.tagName === 'path') iconName = 'pen-tool';
+        else if (node.tagName === 'image') iconName = 'image';
+        else if (node.tagName === 'text' || node.tagName === 'tspan') iconName = 'type';
+        else if (node.tagName === 'circle' || node.tagName === 'ellipse') iconName = 'circle';
+        else if (node.tagName === 'line' || node.tagName === 'polyline') iconName = 'minus';
+        else if (node.tagName === 'use') iconName = 'copy';
+        iconWrapper.innerHTML = `<i data-lucide="${iconName}" class="w-3.5 h-3.5"></i>`;
 
-        // --- Resizable Panels Logic ---
-        const leftSidebar = document.getElementById('left-sidebar');
-        const rightSidebar = document.getElementById('right-sidebar');
-        const resizerLeft = document.getElementById('resizer-left');
-        const resizerRight = document.getElementById('resizer-right');
+        const label = document.createElement('span');
+        label.className = 'flex-1 truncate text-xs font-medium text-slate-600 select-none font-mono layer-label';
+        label.textContent = node.id || node.tagName;
 
-        let isResizingLeft = false;
-        let isResizingRight = false;
-
-        resizerLeft.addEventListener('mousedown', (e) => {
-            isResizingLeft = true;
-            document.body.style.cursor = 'col-resize';
-            resizerLeft.classList.add('resizing');
-            e.preventDefault();
-        });
-
-        resizerRight.addEventListener('mousedown', (e) => {
-            isResizingRight = true;
-            document.body.style.cursor = 'col-resize';
-            resizerRight.classList.add('resizing');
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizingLeft && !isResizingRight) return;
-
-            if (isResizingLeft) {
-                const newWidth = e.clientX;
-                if (newWidth > 200 && newWidth < 600) {
-                    leftSidebar.style.width = `${newWidth}px`;
-                }
-            }
-
-            if (isResizingRight) {
-                const newWidth = window.innerWidth - e.clientX;
-                if (newWidth > 200 && newWidth < 600) {
-                    rightSidebar.style.width = `${newWidth}px`;
-                }
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            isResizingLeft = false;
-            isResizingRight = false;
-            document.body.style.cursor = 'default';
-            resizerLeft.classList.remove('resizing');
-            resizerRight.classList.remove('resizing');
-        });
-
-        // --- Initialization ---
-        function initIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
-        window.addEventListener('load', () => { initIcons(); renderPresets(); renderRelationGroups(); });
-
-        // --- Relation Functions ---
-        function renderRelationGroups() {
-            const container = document.getElementById('relation-groups-list');
-            if (!container) return;
-            
-            container.innerHTML = relationGroups.map((group, idx) => `
-                <div class="border ${currentRelationGroupId === group.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'} rounded-lg overflow-hidden transition-all">
-                    <div class="flex items-center justify-between p-2 cursor-pointer hover:bg-slate-50" onclick="selectRelationGroup('${group.id}')">
-                        <div class="flex items-center gap-2 flex-1">
-                            <i data-lucide="link-2" class="w-4 h-4 ${currentRelationGroupId === group.id ? 'text-emerald-600' : 'text-slate-400'}"></i>
-                            <input type="text" value="${group.name}" class="text-xs font-medium bg-transparent border-none focus:ring-1 focus:ring-emerald-500 rounded px-1 w-32" onchange="renameRelationGroup('${group.id}', this.value)" onclick="event.stopPropagation()">
-                            <span class="text-[10px] text-slate-400">(${group.elements.length} items)</span>
-                        </div>
-                        <div class="flex gap-1">
-                            <button onclick="event.stopPropagation(); addToRelationFromGroupPrompt('${group.id}')" class="p-1 text-slate-400 hover:text-emerald-600 transition-colors" title="Add selected elements">
-                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                            </button>
-                            <button onclick="event.stopPropagation(); removeRelationGroup('${group.id}')" class="p-1 text-slate-400 hover:text-red-600 transition-colors" title="Delete group">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="group-items-${group.id.replace(/[^a-zA-Z0-9]/g, '_')}" class="border-t border-slate-100 p-2 space-y-1 max-h-48 overflow-y-auto text-[11px]">
-                        ${group.elements.length === 0 ? 
-                            '<div class="text-slate-400 italic text-[10px] text-center py-2">No elements. Double-click or long-press on canvas elements to add.</div>' : 
-                            group.elements.map(el => `
-                                <div class="flex items-center justify-between group-item px-1 py-0.5 hover:bg-slate-100 rounded cursor-pointer" onclick="selectElementById('${el.id}')">
-                                    <span class="font-mono text-slate-600 truncate flex-1">${el.id || el.tagName || 'Unknown'}</span>
-                                    <button onclick="event.stopPropagation(); removeFromRelationGroup('${group.id}', '${el.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                        <i data-lucide="x" class="w-3 h-3"></i>
-                                    </button>
-                                </div>
-                            `).join('')
-                        }
-                    </div>
-                </div>
-            `).join('');
-            initIcons();
+        // Meta ID badge in tree
+        const metaVal = getMetadataValue(node);
+        const metaBadge = document.createElement('span');
+        if (metaVal !== null) {
+            metaBadge.className = 'ml-1 text-[9px] font-mono font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 px-1 py-0.5 rounded flex-shrink-0';
+            metaBadge.textContent = `#${metaVal}`;
+            metaBadge.title = `Metadata ID: ${metaVal}`;
         }
 
-        function selectRelationGroup(groupId) {
-            currentRelationGroupId = groupId;
-            renderRelationGroups();
-            statusBar.textContent = `Relation group "${relationGroups.find(g => g.id === groupId)?.name}" selected`;
+        row.addEventListener('dblclick', e => { e.stopPropagation(); startInlineRename(label, node); });
+        row.onclick = e => { e.stopPropagation(); handleSelection(node, e.shiftKey || e.ctrlKey); };
+
+        row.appendChild(toggleBtn);
+        row.appendChild(eyeBtn);
+        row.appendChild(iconWrapper);
+        row.appendChild(label);
+        if (metaVal !== null) row.appendChild(metaBadge);
+        container.appendChild(row);
+
+        if (hasChildren) {
+            const cc = document.createElement('div');
+            cc.className = 'tree-children-container';
+            if (depth > 0) cc.classList.add('hidden', 'border-l', 'border-slate-200', 'ml-[19px]');
+            children.forEach(c => { const ci = createTreeItem(c, depth + 1); if (ci) cc.appendChild(ci); });
+            container.appendChild(cc);
         }
+        return container;
+    }
 
-        function renameRelationGroup(groupId, newName) {
-            const group = relationGroups.find(g => g.id === groupId);
-            if (group) {
-                group.name = newName;
-                renderRelationGroups();
-                statusBar.textContent = `Group renamed to "${newName}"`;
-            }
+    const root = createTreeItem(rootSvg);
+    if (root) layersTree.appendChild(root);
+    initIcons();
+}
+
+function startInlineRename(labelEl, svgNode) {
+    const currentId = svgNode.id || '';
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = currentId; input.className = 'inline-rename';
+    labelEl.replaceWith(input); input.focus(); input.select();
+    const commit = () => {
+        const newId = input.value.trim();
+        const newLabel = document.createElement('span');
+        newLabel.className = 'flex-1 truncate text-xs font-medium text-slate-600 select-none font-mono layer-label';
+        newLabel.textContent = newId || svgNode.tagName;
+        input.replaceWith(newLabel);
+        if (newId && newId !== currentId) {
+            const oldId = svgNode.id; svgNode.id = newId;
+            // !! NEVER touch metadata
+            relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
+            renderRelationGroups(); flashElement(svgNode, '#6366f1');
+            statusBar.textContent = `SVG ID "${oldId}" → "${newId}" (Metadata ID unchanged)`;
         }
-
-        function createNewRelationGroup() {
-            const newId = `Relation_${Date.now()}`;
-            const newName = `Relation ${relationGroups.length + 1}`;
-            relationGroups.push({ id: newId, name: newName, elements: [] });
-            currentRelationGroupId = newId;
-            renderRelationGroups();
-            statusBar.textContent = `New relation group "${newName}" created`;
+        newLabel.parentElement?.addEventListener('dblclick', e => { e.stopPropagation(); startInlineRename(newLabel, svgNode); });
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') input.blur();
+        if (e.key === 'Escape') {
+            const l = document.createElement('span');
+            l.className = 'flex-1 truncate text-xs font-medium text-slate-600 select-none font-mono layer-label';
+            l.textContent = currentId || svgNode.tagName;
+            input.replaceWith(l);
         }
-
-        function removeRelationGroup(groupId) {
-            if (relationGroups.length === 1) {
-                alert("Cannot delete the last relation group. Create a new one first.");
-                return;
-            }
-            relationGroups = relationGroups.filter(g => g.id !== groupId);
-            if (currentRelationGroupId === groupId) {
-                currentRelationGroupId = relationGroups[0]?.id || null;
-            }
-            renderRelationGroups();
-            statusBar.textContent = `Relation group removed`;
-        }
-
-        function addElementToRelationGroup(element, groupId) {
-            const group = relationGroups.find(g => g.id === groupId);
-            if (!group) return false;
-            
-            // Check if already exists
-            if (group.elements.some(el => el.id === element.id && el.tagName === element.tagName)) {
-                statusBar.textContent = `Element already in this relation group`;
-                return false;
-            }
-            
-            // Store element reference (id and tagName for persistence)
-            group.elements.push({
-                id: element.id || `temp_${Date.now()}`,
-                tagName: element.tagName,
-                originalElement: element // Keep reference for highlighting
-            });
-            
-            renderRelationGroups();
-            
-            // Flash the element
-            element.classList.add('relation-flash');
-            setTimeout(() => element.classList.remove('relation-flash'), 500);
-            
-            statusBar.textContent = `Added "${element.id || element.tagName}" to ${group.name}`;
-            return true;
-        }
-
-        function addSelectedToRelation() {
-            if (state.selectedElements.size === 0) {
-                alert("Please select at least one element first.");
-                return;
-            }
-            
-            const group = relationGroups.find(g => g.id === currentRelationGroupId);
-            if (!group) {
-                alert("No relation group selected.");
-                return;
-            }
-            
-            state.selectedElements.forEach(el => {
-                addElementToRelationGroup(el, currentRelationGroupId);
-            });
-        }
-
-        function addToSelectedRelation() {
-            if (state.contextTarget) {
-                addElementToRelationGroup(state.contextTarget, currentRelationGroupId);
-            }
-        }
-
-        function addToRelationFromGroupPrompt(groupId) {
-            if (state.selectedElements.size === 0) {
-                alert("Please select elements on the canvas first.");
-                return;
-            }
-            
-            state.selectedElements.forEach(el => {
-                addElementToRelationGroup(el, groupId);
-            });
-        }
-
-        function removeFromRelationGroup(groupId, elementId) {
-            const group = relationGroups.find(g => g.id === groupId);
-            if (group) {
-                group.elements = group.elements.filter(el => el.id !== elementId);
-                renderRelationGroups();
-                statusBar.textContent = `Element removed from ${group.name}`;
-            }
-        }
-
-        function selectElementById(elementId) {
-            const svg = svgContainer.querySelector('svg');
-            if (!svg) return;
-            
-            const element = svg.querySelector(`[id="${elementId}"]`);
-            if (element) {
-                handleSelection(element, false);
-                // Scroll to element
-                const box = getTransformedBox(element);
-                canvasWrapper.scrollTo({
-                    left: box.left - 100,
-                    top: box.top - 100,
-                    behavior: 'smooth'
-                });
-            }
-        }
-
-        // Update the addToRelationGroup function to work with double-click and long-press
-        function handleDoubleClickForRelation(element) {
-            if (state.autoNaming.active) return; // Don't interfere with auto-naming mode
-            
-            addElementToRelationGroup(element, currentRelationGroupId);
-        }
-
-        function startLongPress(element) {
-            state.longPressTimeout = setTimeout(() => {
-                state.isLongPressing = true;
-                if (!state.autoNaming.active) {
-                    handleDoubleClickForRelation(element);
-                }
-            }, 500);
-        }
-
-        function cancelLongPress() {
-            if (state.longPressTimeout) {
-                clearTimeout(state.longPressTimeout);
-                state.longPressTimeout = null;
-            }
-            state.isLongPressing = false;
-        }
-
-        // --- Auto Rename Logic ---
-        function toggleAutoNameMode() {
-            state.autoNaming.active = !state.autoNaming.active;
-            const btnKnob = document.getElementById('btn-auto-name-knob');
-            const btnBg = document.getElementById('btn-auto-name-toggle');
-            const controls = document.getElementById('auto-name-controls');
-            
-            if (state.autoNaming.active) {
-                btnKnob.classList.add('translate-x-5');
-                btnBg.classList.replace('bg-slate-200', 'bg-indigo-600');
-                controls.classList.remove('opacity-50', 'pointer-events-none');
-                deselectAll();
-                document.body.style.cursor = 'alias';
-                statusBar.textContent = "Auto-Rename Mode: ON - Click elements to rename them";
-            } else {
-                btnKnob.classList.remove('translate-x-5');
-                btnBg.classList.replace('bg-indigo-600', 'bg-slate-200');
-                controls.classList.add('opacity-50', 'pointer-events-none');
-                document.body.style.cursor = 'default';
-                statusBar.textContent = "Auto-Rename Mode: OFF";
-            }
-        }
-
-        function applyAutoName(el) {
-            const newId = `${state.autoNaming.prefix}${state.autoNaming.counter}`;
-            el.id = newId;
-            
-            state.autoNaming.counter++;
-            document.getElementById('input-auto-counter').value = state.autoNaming.counter;
-            
-            statusBar.textContent = `Renamed to: ${newId}`;
-            
-            const treeId = state.nodeMap.get(el);
-            if(treeId) {
-                const label = document.querySelector(`#${treeId} span.truncate`);
-                if(label) {
-                    label.textContent = newId;
-                    label.classList.add('text-indigo-600', 'font-bold');
-                    setTimeout(() => label.classList.remove('text-indigo-600', 'font-bold'), 500);
-                }
-            }
-
-            const originalOutline = el.style.outline;
-            el.style.outline = "3px solid #6366f1";
-            setTimeout(() => {
-                el.style.outline = originalOutline;
-            }, 300);
-        }
-
-        // --- Context Menu ---
-        canvasWrapper.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const target = e.target;
-            if (svgContainer.contains(target) && target.tagName !== 'svg') {
-                state.contextTarget = target;
-                contextMenu.style.display = 'block';
-                contextMenu.style.left = `${e.clientX}px`;
-                contextMenu.style.top = `${e.clientY}px`;
-                if (!state.selectedElements.has(target)) handleSelection(target, false);
-            } else {
-                state.contextTarget = null;
-                contextMenu.style.display = 'none';
-            }
-        });
-
-        document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
-
-        function selectSimilar() {
-            if (!state.contextTarget) return;
-            const source = state.contextTarget;
-            const computed = window.getComputedStyle(source);
-            const sourceFill = computed.fill;
-            const sourceStroke = computed.stroke;
-            const tagName = source.tagName;
-            const svg = svgContainer.querySelector('svg');
-            const allElements = svg.querySelectorAll(tagName);
-            let count = 0;
-            allElements.forEach(el => {
-                const style = window.getComputedStyle(el);
-                if (style.fill === sourceFill && style.stroke === sourceStroke) {
-                    state.selectedElements.add(el);
-                    count++;
-                }
-            });
-            updateSelectionVisuals();
-            renderMultiSelectionInspector();
-            statusBar.textContent = `Selected ${count} similar items`;
-        }
-
-        function deleteSelected() {
-            if(state.selectedElements.size > 0) {
-                if(confirm(`Delete ${state.selectedElements.size} items?`)) {
-                    state.selectedElements.forEach(el => el.remove());
-                    deselectAll();
-                    rebuildLayersTree(svgContainer.querySelector('svg'));
-                }
-            }
-        }
-
-        // --- Image Underlay ---
-        underlayInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const svg = svgContainer.querySelector('svg');
-                    if (!svg) { 
-                        alert("Please load an SVG floor plan first."); 
-                        underlayInput.value = ''; 
-                        return; 
-                    }
-                    
-                    let existing = svg.querySelector('#underlay-img');
-                    if (existing) existing.remove();
-                    
-                    const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
-                    img.id = 'underlay-img';
-                    img.setAttribute('href', evt.target.result);
-                    
-                    let x = 0, y = 0, w = 1000, h = 1000;
-                    if (svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width > 0) {
-                        x = svg.viewBox.baseVal.x; y = svg.viewBox.baseVal.y; w = svg.viewBox.baseVal.width; h = svg.viewBox.baseVal.height;
-                    } else {
-                        try { const bbox = svg.getBBox(); if (bbox.width > 0) { x = bbox.x; y = bbox.y; w = bbox.width; h = bbox.height; } } catch(e) {}
-                    }
-                    
-                    img.setAttribute('width', w); img.setAttribute('height', h); img.setAttribute('x', x); img.setAttribute('y', y);
-                    img.setAttribute('opacity', '0.5'); img.style.pointerEvents = 'none'; img.setAttribute('preserveAspectRatio', 'none');
-
-                    state.underlayImg = img;
-                    if (svg.firstChild) svg.insertBefore(img, svg.firstChild); else svg.appendChild(img);
-                    
-                    underlayInput.value = '';
-                    underlayModal.classList.remove('hidden');
-                    document.getElementById('underlay-opacity').value = 0.5;
-                    statusBar.textContent = "Underlay image added";
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        function updateUnderlayOpacity(val) { if (state.underlayImg) state.underlayImg.setAttribute('opacity', val); }
-        function removeUnderlay() {
-            if (state.underlayImg) { state.underlayImg.remove(); state.underlayImg = null; underlayModal.classList.add('hidden'); }
-        }
-
-        // --- Presets Logic ---
-        function renderPresets() {
-            presetsList.innerHTML = presets.map((p, index) => `
-                <div class="group relative bg-white border border-slate-200 hover:border-indigo-400 rounded-lg p-2.5 flex items-center gap-3 transition-all shadow-sm hover:shadow-md">
-                    <div onclick="applyPreset(${index})" class="flex-1 flex items-center gap-3 cursor-pointer">
-                        <div class="w-8 h-8 rounded-md border border-slate-100 flex items-center justify-center shrink-0" 
-                             style="background-color: ${p.style.fill === 'none' ? '#fff' : p.style.fill}; border-color: ${p.style.stroke === 'none' ? '#eee' : p.style.stroke}; border-width: 2px;">
-                            <i data-lucide="${p.icon || 'box'}" class="w-4 h-4" style="color: ${isDark(p.style.fill) ? 'white' : 'black'}"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <div class="text-xs font-bold text-slate-700 truncate">${p.name}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">Fill: ${p.style.fill}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="openPresetModal(${index})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Edit"><i data-lucide="pencil" class="w-3 h-3"></i></button>
-                        <button onclick="deletePreset(${index})" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Delete"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
-                    </div>
-                </div>
-            `).join('');
-            initIcons();
-        }
-
-        let presetToDelete = null;
-        function deletePreset(index) { presetToDelete = index; toggleConfirmModal(true); }
-        function toggleConfirmModal(show) {
-            const modal = document.getElementById('confirm-modal');
-            if(show) modal.classList.remove('hidden'); else { modal.classList.add('hidden'); presetToDelete = null; }
-        }
-        function executeDelete() { if(presetToDelete !== null) { presets.splice(presetToDelete, 1); renderPresets(); toggleConfirmModal(false); } }
-
-        function openPresetModal(index = null, fromSelection = false) {
-            presetModal.classList.remove('hidden');
-            const isEdit = index !== null;
-            document.getElementById('modal-title').textContent = isEdit ? 'Edit Preset' : 'New Preset';
-            document.getElementById('preset-index').value = index !== null ? index : -1;
-            let data = { name: 'New Style', style: { fill: '#cccccc', stroke: '#000000', strokeWidth: '1px', opacity: '1' } };
-            if (isEdit) data = JSON.parse(JSON.stringify(presets[index]));
-            else if (fromSelection && state.selectedElements.size > 0) {
-                const el = [...state.selectedElements][0];
-                const computed = window.getComputedStyle(el);
-                data.style.fill = rgbToHex(computed.fill);
-                data.style.stroke = rgbToHex(computed.stroke);
-                data.style.strokeWidth = computed.strokeWidth;
-                data.style.opacity = computed.opacity;
-                data.name = el.id || el.tagName;
-            }
-            document.getElementById('preset-name').value = data.name;
-            document.getElementById('preset-fill').value = data.style.fill;
-            document.getElementById('preset-fill-preview').style.backgroundColor = data.style.fill === 'none' ? 'transparent' : data.style.fill;
-            document.getElementById('preset-stroke').value = data.style.stroke;
-            document.getElementById('preset-stroke-preview').style.borderColor = data.style.stroke === 'none' ? 'transparent' : data.style.stroke;
-            document.getElementById('preset-width').value = data.style.strokeWidth;
-            document.getElementById('preset-opacity').value = data.style.opacity;
-        }
-        function closePresetModal() { presetModal.classList.add('hidden'); }
-        function savePreset() {
-            const index = parseInt(document.getElementById('preset-index').value);
-            const newPreset = {
-                name: document.getElementById('preset-name').value || 'Untitled', icon: 'star',
-                style: {
-                    fill: document.getElementById('preset-fill').value,
-                    stroke: document.getElementById('preset-stroke').value,
-                    strokeWidth: document.getElementById('preset-width').value,
-                    opacity: document.getElementById('preset-opacity').value
-                }
-            };
-            if (index >= 0) presets[index] = newPreset; else presets.push(newPreset);
-            renderPresets(); closePresetModal();
-        }
-
-        function isDark(color) {
-            if(!color || color === 'none' || color.startsWith('rgb')) return false;
-            if(color.startsWith('#')) {
-                const hex = color.replace('#', '');
-                const r = parseInt(hex.substr(0, 2), 16);
-                const g = parseInt(hex.substr(2, 2), 16);
-                const b = parseInt(hex.substr(4, 2), 16);
-                return ((r * 299 + g * 587 + b * 114) / 1000) < 128;
-            }
-            return false;
-        }
-
-        function applyPreset(index) {
-            const preset = presets[index];
-            if (state.selectedElements.size === 0) return alert("Select elements first.");
-            state.selectedElements.forEach(el => {
-                Object.assign(el.style, preset.style);
-                if(preset.style.fill) el.setAttribute('fill', preset.style.fill);
-                if(preset.style.stroke) el.setAttribute('stroke', preset.style.stroke);
-                if(preset.style.strokeWidth) el.setAttribute('stroke-width', preset.style.strokeWidth);
-                if(preset.style.opacity) el.setAttribute('opacity', preset.style.opacity);
-            });
-            if(state.selectedElements.size === 1) renderInspector([...state.selectedElements][0]);
-            statusBar.textContent = `Applied "${preset.name}"`;
-        }
-
-        // --- Tabs Logic ---
-        function switchLeftTab(tab) {
-            state.activeLeftTab = tab;
-            const tabs = ['presets', 'props', 'relations'];
-            tabs.forEach(t => {
-                const btn = document.getElementById(`tab-btn-${t}`);
-                const panel = document.getElementById(`panel-${t}`);
-                if(btn) btn.className = t === tab ? "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 transition-colors" : "flex-1 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors";
-                if(panel) panel.classList.toggle('hidden', t !== tab);
-            });
-            if (tab === 'relations') renderRelationGroups();
-        }
-
-        // --- File Handling ---
-        fileInput.addEventListener('change', (e) => { if(e.target.files[0]) loadFile(e.target.files[0]); });
-        
-        window.addEventListener('dragover', (e) => e.preventDefault());
-        window.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (e.dataTransfer.files.length && e.dataTransfer.files[0].type === 'image/svg+xml') {
-                loadFile(e.dataTransfer.files[0]);
-            } else {
-                alert('Please drop a valid SVG file.');
-            }
-        });
-
-        // --- EXPORT LOGIC ---
-        function toggleExportMenu(force) {
-            const menu = document.getElementById('export-menu');
-            if (force !== undefined) {
-                menu.classList.toggle('hidden', !force);
-            } else {
-                menu.classList.toggle('hidden');
-            }
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#export-btn') && !e.target.closest('#export-menu')) {
-                toggleExportMenu(false);
-            }
-        });
-
-        function prepareSVGForExport() {
-            if (!state.svgLoaded) { alert("No SVG loaded."); return null; }
-            const originalSvg = svgContainer.querySelector('svg');
-            const clone = originalSvg.cloneNode(true);
-            clone.style.transform = ''; 
-            clone.style.transformOrigin = ''; 
-            clone.style.transition = '';
-            
-            const underlay = clone.querySelector('image#underlay-img');
-            if(underlay) underlay.remove();
-            
-            const serializer = new XMLSerializer();
-            let source = serializer.serializeToString(clone);
-            
-            if(!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
-                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-            }
-            return source;
-        }
-
-        function handleExport(type) {
-            const source = prepareSVGForExport();
-            if (!source) return;
-
-            if (type === 'download') {
-                const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url; 
-                link.download = `floorplan_edit_${Date.now()}.svg`;
-                document.body.appendChild(link); 
-                link.click(); 
-                document.body.removeChild(link);
-            } else if (type === 'copy') {
-                navigator.clipboard.writeText(source).then(() => {
-                    statusBar.textContent = "SVG Code copied to clipboard!";
-                });
-            } else if (type === 'css') {
-                const encoded = encodeURIComponent(source).replace(/'/g, '%27').replace(/"/g, '%22');
-                const dataUri = `url("data:image/svg+xml;charset=utf-8,${encoded}")`;
-                navigator.clipboard.writeText(dataUri).then(() => {
-                    statusBar.textContent = "CSS Data URI copied to clipboard!";
-                });
-            }
-            toggleExportMenu(false);
-        }
-
-        function loadFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (!e.target.result.includes('<svg')) return alert("Invalid SVG file.");
-                svgContainer.innerHTML = e.target.result;
-                document.getElementById('empty-state').style.display = 'none';
-                state.svgLoaded = true; state.scale = 1; state.selectedElements.clear(); state.nodeMap.clear();
-                const svg = svgContainer.querySelector('svg');
-                if (svg) {
-                    svg.style.width = '100%'; svg.style.height = '100%'; svg.style.overflow = 'visible';
-                    const viewBox = svg.viewBox.baseVal;
-                    if (viewBox && viewBox.width > 0) { artboard.style.width = viewBox.width + 'px'; artboard.style.height = viewBox.height + 'px'; }
-                    attachSVGListeners(svg);
-                    rebuildLayersTree(svg);
-                    statusBar.textContent = `${file.name} loaded`;
-                    zoomSlider.value = 100;
-                    zoomDisplay.textContent = '100%';
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // --- Interaction Logic with Double-click and Long-press ---
-        function attachSVGListeners(svgElement) {
-            svgElement.addEventListener('mouseover', (e) => { if (e.target !== svgElement) highlightElement(e.target); });
-            svgElement.addEventListener('mouseout', () => hideHighlight());
-            
-            // Double-click handler for relation
-            svgElement.addEventListener('dblclick', (e) => {
-                e.stopPropagation();
-                if (e.target !== svgElement && !state.autoNaming.active) {
-                    handleDoubleClickForRelation(e.target);
-                }
-            });
-            
-            // Long-press handlers
-            svgElement.addEventListener('mousedown', (e) => {
-                if (e.target !== svgElement && !state.autoNaming.active) {
-                    startLongPress(e.target);
-                }
-            });
-            
-            svgElement.addEventListener('mouseup', () => cancelLongPress());
-            svgElement.addEventListener('mouseleave', () => cancelLongPress());
-            
-            // Click handler for selection and auto-rename
-            svgElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                
-                // Cancel long press if click happens
-                cancelLongPress();
-                
-                // Check for Auto-Name Mode
-                if (state.autoNaming.active) {
-                    if (e.target !== svgElement) {
-                        applyAutoName(e.target);
-                        handleSelection(e.target, false);
-                    }
-                    return;
-                }
-
-                // Normal selection mode
-                if (e.target !== svgElement) {
-                    handleSelection(e.target, e.shiftKey || e.ctrlKey);
-                } else {
-                    deselectAll(); 
-                }
-            });
-            
-            canvasWrapper.addEventListener('click', (e) => { if (e.target === canvasWrapper || e.target === artboard) deselectAll(); });
-        }
-
-        function getTransformedBox(element) {
-            const rect = element.getBoundingClientRect();
-            const wrapperRect = canvasWrapper.getBoundingClientRect();
-            return { top: rect.top - wrapperRect.top + canvasWrapper.scrollTop, left: rect.left - wrapperRect.left + canvasWrapper.scrollLeft, width: rect.width, height: rect.height };
-        }
-        
-        function highlightElement(el) {
-            const box = getTransformedBox(el);
-            highlightBox.style.display = 'block'; highlightBox.style.top = `${box.top}px`; highlightBox.style.left = `${box.left}px`; highlightBox.style.width = `${box.width}px`; highlightBox.style.height = `${box.height}px`;
-            statusBar.textContent = `Hover: <${el.tagName}> ${el.id ? '#'+el.id : ''}`;
-        }
-        
-        function hideHighlight() { highlightBox.style.display = 'none'; }
-
-        function handleSelection(el, isMultiSelect) {
-            if (isMultiSelect) state.selectedElements.has(el) ? state.selectedElements.delete(el) : state.selectedElements.add(el);
-            else { state.selectedElements.clear(); state.selectedElements.add(el); }
-            updateSelectionVisuals();
-            if (state.selectedElements.size === 1) renderInspector([...state.selectedElements][0]);
-            else if (state.selectedElements.size > 1) renderMultiSelectionInspector();
-        }
-
-        function deselectAll() { 
-            state.selectedElements.clear(); 
-            updateSelectionVisuals(); 
-            inspectorContent.innerHTML = `<div class="text-slate-400 text-sm text-center mt-10 italic">Select an element to view properties.</div>`;
-        }
-
-        function updateSelectionVisuals() {
-            selectionOverlay.innerHTML = '';
-            document.querySelectorAll('.layer-item').forEach(item => item.classList.remove('active-layer'));
-            state.selectedElements.forEach(el => {
-                const box = getTransformedBox(el);
-                const div = document.createElement('div');
-                div.className = 'selection-box'; div.style.top = `${box.top}px`; div.style.left = `${box.left}px`; div.style.width = `${box.width}px`; div.style.height = `${box.height}px`;
-                selectionOverlay.appendChild(div);
-                
-                const treeId = state.nodeMap.get(el);
-                if (treeId) {
-                    const treeItem = document.getElementById(treeId);
-                    if (treeItem) {
-                        treeItem.classList.add('active-layer');
-                        if (state.selectedElements.size === 1) {
-                            revealInTree(treeItem);
-                            treeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                    }
-                }
-            });
-            statusBar.textContent = `${state.selectedElements.size} object(s) selected`;
-        }
-
-        function revealInTree(rowElement) {
-            let current = rowElement.parentElement; 
-            while (current && current.id !== 'layers-tree') {
-                if (current.classList.contains('tree-children-container') && current.classList.contains('hidden')) {
-                     current.classList.remove('hidden');
-                     const parentContainer = current.parentElement;
-                     if (parentContainer) {
-                         const parentRow = parentContainer.querySelector('.layer-item'); 
-                         if (parentRow) {
-                             const toggleBtn = parentRow.querySelector('.tree-toggle-btn');
-                             if (toggleBtn) {
-                                 toggleBtn.innerHTML = `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>`;
-                                 initIcons();
-                             }
-                         }
-                     }
-                }
-                current = current.parentElement;
-            }
-        }
-
-        // --- Editing Logic ---
-        function updateElementProperty(prop, value) {
-            if(state.selectedElements.size === 0) return;
-            state.selectedElements.forEach(el => {
-                 if (prop === 'id' && state.selectedElements.size === 1) {
-                     el.id = value;
-                     const treeId = state.nodeMap.get(el);
-                     if(treeId) {
-                         const label = document.querySelector(`#${treeId} span.truncate`);
-                         if(label) label.textContent = value || el.tagName;
-                     }
-                 } else if (prop !== 'id') {
-                     el.style[prop] = value;
-                     if(prop === 'strokeWidth') el.setAttribute('stroke-width', value);
-                     if(prop === 'fill') el.setAttribute('fill', value);
-                     if(prop === 'stroke') el.setAttribute('stroke', value);
-                 }
-            });
-        }
-
-        // --- Inspector & Tree ---
-        function renderMultiSelectionInspector() {
-            inspectorContent.innerHTML = `
-                <div class="text-center mt-10 space-y-4">
-                    <div class="inline-block p-3 bg-indigo-50 text-indigo-600 rounded-full">
-                        <i data-lucide="layers" class="w-8 h-8"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-700 text-lg">${state.selectedElements.size} Items Selected</h3>
-                        <p class="text-xs text-slate-400 max-w-[200px] mx-auto">Use the <strong>Presets</strong> tab to style them all at once, or use properties below to edit uniformly.</p>
-                    </div>
-                     <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg text-left">
-                        <span class="text-xs text-slate-500 block mb-2 font-bold">Quick Actions</span>
-                        <div class="grid grid-cols-2 gap-2">
-                             <button onclick="updateElementProperty('fill', 'none')" class="text-xs bg-white border p-1 rounded hover:bg-slate-50">Remove Fill</button>
-                             <button onclick="updateElementProperty('stroke', '#000000')" class="text-xs bg-white border p-1 rounded hover:bg-slate-50">Black Stroke</button>
-                        </div>
-                     </div>
-                </div>`;
-            initIcons();
-        }
-
-        function renderInspector(el) {
-            const computed = window.getComputedStyle(el);
-            const fillHex = rgbToHex(computed.fill);
-            const strokeHex = rgbToHex(computed.stroke);
-            const currentOpacity = computed.opacity || 1;
-            const currentStrokeWidth = parseFloat(computed.strokeWidth) || 0;
-
-            const propsHtml = `
-                <div class="space-y-6 animate-fade-in">
-                    <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
-                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600"><i data-lucide="box-select" class="w-6 h-6"></i></div>
-                        <div class="flex-1">
-                            <h3 class="font-bold text-slate-800 font-mono text-lg">&lt;${el.tagName}&gt;</h3>
-                            <div class="flex flex-col mt-1">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">ID</span>
-                                <input type="text" value="${el.id}" class="text-xs font-mono border border-slate-200 rounded px-1.5 py-1 w-full focus:ring-1 focus:ring-indigo-500 outline-none transition-all" placeholder="No ID" onchange="updateElementProperty('id', this.value)">
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Appearance</h4>
-                        <div class="space-y-3">
-                            <div class="bg-slate-50 border border-slate-200 p-2 rounded-lg">
-                                <span class="text-xs text-slate-500 block mb-1">Fill</span>
-                                <div class="flex items-center gap-2">
-                                    <div class="relative w-8 h-8 rounded border border-slate-300 shadow-sm checkerboard overflow-hidden flex-shrink-0">
-                                        <input type="color" value="${fillHex === 'none' ? '#000000' : fillHex}" class="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer p-0 border-0 opacity-0 z-10" oninput="updateElementProperty('fill', this.value); document.getElementById('fill-text').value = this.value; document.getElementById('fill-preview').style.backgroundColor = this.value">
-                                        <div class="w-full h-full pointer-events-none" style="background-color: ${fillHex === 'none' ? 'transparent' : fillHex}" id="fill-preview"></div>
-                                    </div>
-                                    <input type="text" id="fill-text" value="${fillHex}" class="flex-1 min-w-0 text-xs font-mono border border-slate-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-indigo-500 outline-none uppercase" onchange="updateElementProperty('fill', this.value); document.getElementById('fill-preview').style.backgroundColor = this.value">
-                                </div>
-                            </div>
-                            <div class="bg-slate-50 border border-slate-200 p-2 rounded-lg">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-xs text-slate-500">Stroke</span>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[10px] text-slate-400">Width</span>
-                                        <input type="number" value="${currentStrokeWidth}" min="0" step="0.5" class="w-12 text-xs border border-slate-200 rounded px-1 py-0.5 text-right font-mono focus:ring-1 focus:ring-indigo-500 outline-none" onchange="updateElementProperty('strokeWidth', this.value + 'px')">
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <div class="relative w-8 h-8 rounded border border-slate-300 shadow-sm overflow-hidden flex-shrink-0">
-                                         <div class="absolute inset-2 border-2 z-0" id="stroke-preview-inner" style="border-color: ${strokeHex === 'none' ? 'transparent' : strokeHex}; border-style: solid;"></div>
-                                         <input type="color" value="${strokeHex === 'none' ? '#000000' : strokeHex}" class="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer p-0 border-0 opacity-0 z-10" oninput="updateElementProperty('stroke', this.value); document.getElementById('stroke-text').value = this.value; document.getElementById('stroke-preview-inner').style.borderColor = this.value">
-                                    </div>
-                                    <input type="text" id="stroke-text" value="${strokeHex}" class="flex-1 min-w-0 text-xs font-mono border border-slate-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-indigo-500 outline-none uppercase" onchange="updateElementProperty('stroke', this.value); document.getElementById('stroke-preview-inner').style.borderColor = this.value">
-                                </div>
-                            </div>
-                            <div class="pt-1">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-xs text-slate-500">Opacity</span>
-                                    <span class="text-xs font-mono text-slate-700" id="opacity-val">${Math.round(currentOpacity * 100)}%</span>
-                                </div>
-                                <input type="range" min="0" max="1" step="0.01" value="${currentOpacity}" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateElementProperty('opacity', this.value); document.getElementById('opacity-val').textContent = Math.round(this.value * 100) + '%'">
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            inspectorContent.innerHTML = propsHtml;
-            initIcons();
-        }
-
-        function collapseAll() {
-             const toggles = document.querySelectorAll('.tree-toggle-btn');
-             const containers = document.querySelectorAll('.tree-children-container');
-             toggles.forEach(btn => btn.innerHTML = `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`);
-             containers.forEach(div => div.classList.add('hidden'));
-             initIcons();
-        }
-
-        function rebuildLayersTree(rootSvg) {
-            layersTree.innerHTML = ''; let idCounter = 0;
-            function createTreeItem(node, depth = 0) {
-                if (node.nodeType !== 1) return null;
-                const validTags = ['g', 'path', 'rect', 'circle', 'line', 'polyline', 'polygon', 'text', 'image', 'svg'];
-                if (!validTags.includes(node.tagName)) return null;
-                const nodeId = `tree-node-${idCounter++}`; state.nodeMap.set(node, nodeId);
-                
-                const container = document.createElement('div');
-                const row = document.createElement('div');
-                row.className = `layer-item flex items-center py-1.5 px-2 border-b border-slate-100 cursor-pointer group`;
-                row.style.paddingLeft = `${(depth * 12) + 4}px`; row.id = nodeId;
-                
-                row.setAttribute('draggable', 'true');
-                row.svgNode = node;
-
-                row.addEventListener('dragstart', onLayerDragStart);
-                row.addEventListener('dragover', onLayerDragOver);
-                row.addEventListener('dragleave', onLayerDragLeave);
-                row.addEventListener('drop', onLayerDrop);
-
-                const children = Array.from(node.children).filter(child => child.nodeType === 1 && validTags.includes(child.tagName));
-                const hasChildren = children.length > 0;
-
-                const toggleBtn = document.createElement('button');
-                toggleBtn.className = "text-slate-400 hover:text-slate-600 w-5 h-5 flex items-center justify-center mr-1 tree-toggle-btn";
-                if (hasChildren) {
-                    const isExpanded = depth === 0;
-                    toggleBtn.innerHTML = isExpanded ? `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>` : `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`;
-                    toggleBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const childrenContainer = container.querySelector('.tree-children-container');
-                        if (childrenContainer) {
-                            const isHidden = childrenContainer.classList.contains('hidden');
-                            if (isHidden) { childrenContainer.classList.remove('hidden'); toggleBtn.innerHTML = `<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>`; }
-                            else { childrenContainer.classList.add('hidden'); toggleBtn.innerHTML = `<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>`; }
-                            initIcons();
-                        }
-                    };
-                } else {
-                    toggleBtn.innerHTML = `<span class="w-3.5 h-3.5"></span>`;
-                    toggleBtn.style.pointerEvents = 'none';
-                }
-
-                const eyeBtn = document.createElement('button');
-                eyeBtn.className = "text-slate-400 hover:text-slate-600 mr-2 flex-shrink-0";
-                eyeBtn.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i>`;
-                eyeBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const isHidden = node.style.visibility === 'hidden';
-                    node.style.visibility = isHidden ? 'visible' : 'hidden';
-                    eyeBtn.innerHTML = isHidden ? `<i data-lucide="eye" class="w-3.5 h-3.5"></i>` : `<i data-lucide="eye-off" class="w-3.5 h-3.5 text-slate-300"></i>`;
-                    initIcons();
-                };
-
-                const iconWrapper = document.createElement('span');
-                iconWrapper.className = "mr-2 text-slate-500";
-                let iconName = 'box';
-                if (node.tagName === 'g' || node.tagName === 'svg') iconName = 'folder';
-                else if (node.tagName === 'path') iconName = 'pen-tool';
-                else if (node.tagName === 'image') iconName = 'image';
-                iconWrapper.innerHTML = `<i data-lucide="${iconName}" class="w-3.5 h-3.5"></i>`;
-
-                const label = document.createElement('span');
-                label.className = "flex-1 truncate text-xs font-medium text-slate-600 select-none font-mono";
-                label.textContent = node.id || node.tagName;
-
-                row.onclick = (e) => { e.stopPropagation(); handleSelection(node, e.shiftKey || e.ctrlKey); };
-                row.appendChild(toggleBtn); row.appendChild(eyeBtn); row.appendChild(iconWrapper); row.appendChild(label);
-                container.appendChild(row);
-
-                if (hasChildren) {
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = "tree-children-container";
-                    if(depth > 0) childrenContainer.classList.add('hidden');
-                    if(depth > 0) childrenContainer.classList.add('border-l', 'border-slate-200', 'ml-[19px]');
-                    children.forEach(c => { const ci = createTreeItem(c, depth + 1); if(ci) childrenContainer.appendChild(ci); });
-                    container.appendChild(childrenContainer);
-                }
-                return container;
-            }
-            const root = createTreeItem(rootSvg); if(root) layersTree.appendChild(root);
-            initIcons();
-        }
-
-        // --- Drag and Drop Logic ---
-        function onLayerDragStart(e) {
-            state.draggedLayer = e.target.svgNode;
-            e.dataTransfer.effectAllowed = 'move';
-            e.target.style.opacity = '0.5';
-        }
-
-        function onLayerDragOver(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const targetRow = e.target.closest('.layer-item');
-            if (!targetRow || !state.draggedLayer) return;
-
-            const targetNode = targetRow.svgNode;
-            
-            if (state.draggedLayer === targetNode || state.draggedLayer.contains(targetNode)) {
-                e.dataTransfer.dropEffect = 'none';
-                return;
-            }
-
-            e.dataTransfer.dropEffect = 'move';
-
-            const rect = targetRow.getBoundingClientRect();
-            const relY = e.clientY - rect.top;
-            const height = rect.height;
-            
-            targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
-
-            const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
-            
-            if (relY < height * 0.25) {
-                targetRow.classList.add('drop-before');
-            } else if (relY > height * 0.75) {
-                targetRow.classList.add('drop-after');
-            } else if (isGroup) {
-                targetRow.classList.add('drop-inside');
-            } else {
-                targetRow.classList.add('drop-after');
-            }
-        }
-
-        function onLayerDragLeave(e) {
-            const targetRow = e.target.closest('.layer-item');
-            if (targetRow) {
-                targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
-            }
-        }
-
-        function onLayerDrop(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const targetRow = e.target.closest('.layer-item');
-            if (!targetRow || !state.draggedLayer) return;
-
-            targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
-            document.querySelectorAll('.layer-item').forEach(el => el.style.opacity = '1');
-
-            const targetNode = targetRow.svgNode;
-            
-            const rect = targetRow.getBoundingClientRect();
-            const relY = e.clientY - rect.top;
-            const height = rect.height;
-            const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
-
-            if (relY < height * 0.25) {
-                if (targetNode.parentNode) {
-                    targetNode.parentNode.insertBefore(state.draggedLayer, targetNode);
-                }
-            } else if (relY > height * 0.75) {
-                if (targetNode.parentNode) {
-                    targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling);
-                }
-            } else if (isGroup) {
-                targetNode.appendChild(state.draggedLayer);
-            } else {
-                if (targetNode.parentNode) {
-                    targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling);
-                }
-            }
-
-            rebuildLayersTree(svgContainer.querySelector('svg'));
-            state.draggedLayer = null;
-        }
-
-        function rgbToHex(rgb) {
-            if (!rgb || rgb === 'none' || rgb === 'transparent') return 'none';
-            if (rgb.startsWith('#')) return rgb;
-            const parts = rgb.match(/[\d.]+/g);
-            if (!parts || parts.length < 3) return rgb; 
-            if (parts.length === 4 && parseFloat(parts[3]) === 0) return 'none';
-            return "#" + ((1 << 24) + (parseInt(parts[0]) << 16) + (parseInt(parts[1]) << 8) + parseInt(parts[2])).toString(16).slice(1).toUpperCase();
-        }
-
-        // Zoom Logic
-        zoomSlider.addEventListener('input', (e) => {
-            state.scale = parseInt(e.target.value) / 100;
-            applyZoom();
-        });
-
-        zoomResetBtn.addEventListener('click', () => { 
-            state.scale = 1; 
-            zoomSlider.value = 100;
-            applyZoom(); 
-        });
-
-        function applyZoom() {
-            const artboard = document.getElementById('artboard');
-            if (artboard) {
-                artboard.style.transform = `scale(${state.scale})`;
-            }
-            hideHighlight(); 
-            updateSelectionVisuals();
-            zoomDisplay.textContent = `${Math.round(state.scale * 100)}%`;
-        }
-    </script>
+    });
+}
+
+// =============================================================
+// DRAG & DROP LAYERS
+// =============================================================
+function onLayerDragStart(e) { state.draggedLayer = e.target.svgNode; e.dataTransfer.effectAllowed = 'move'; e.target.style.opacity = '0.5'; }
+function onLayerDragOver(e) {
+    e.preventDefault(); e.stopPropagation();
+    const targetRow = e.target.closest('.layer-item');
+    if (!targetRow || !state.draggedLayer) return;
+    const targetNode = targetRow.svgNode;
+    if (state.draggedLayer === targetNode || state.draggedLayer.contains(targetNode)) { e.dataTransfer.dropEffect = 'none'; return; }
+    e.dataTransfer.dropEffect = 'move';
+    const rect = targetRow.getBoundingClientRect();
+    const relY = e.clientY - rect.top, height = rect.height;
+    targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
+    const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
+    if (relY < height * 0.25) targetRow.classList.add('drop-before');
+    else if (relY > height * 0.75) targetRow.classList.add('drop-after');
+    else if (isGroup) targetRow.classList.add('drop-inside');
+    else targetRow.classList.add('drop-after');
+}
+function onLayerDragLeave(e) { const r = e.target.closest('.layer-item'); if (r) r.classList.remove('drop-inside', 'drop-before', 'drop-after'); }
+function onLayerDrop(e) {
+    e.preventDefault(); e.stopPropagation();
+    const targetRow = e.target.closest('.layer-item');
+    if (!targetRow || !state.draggedLayer) return;
+    targetRow.classList.remove('drop-inside', 'drop-before', 'drop-after');
+    document.querySelectorAll('.layer-item').forEach(el => el.style.opacity = '1');
+    const targetNode = targetRow.svgNode;
+    const rect = targetRow.getBoundingClientRect();
+    const relY = e.clientY - rect.top, height = rect.height;
+    const isGroup = targetNode.tagName === 'g' || targetNode.tagName === 'svg';
+    if (relY < height * 0.25) { if (targetNode.parentNode) targetNode.parentNode.insertBefore(state.draggedLayer, targetNode); }
+    else if (relY > height * 0.75) { if (targetNode.parentNode) targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling); }
+    else if (isGroup) targetNode.appendChild(state.draggedLayer);
+    else { if (targetNode.parentNode) targetNode.parentNode.insertBefore(state.draggedLayer, targetNode.nextSibling); }
+    rebuildLayersTree(svgContainer.querySelector('svg'));
+    state.draggedLayer = null;
+}
+
+// =============================================================
+// ZOOM
+// =============================================================
+zoomSlider.addEventListener('input', e => { state.scale = parseInt(e.target.value) / 100; applyZoom(); });
+zoomResetBtn.addEventListener('click', () => { state.scale = 1; zoomSlider.value = 100; applyZoom(); });
+function applyZoom() {
+    artboard.style.transform = `scale(${state.scale})`;
+    hideHighlight(); updateSelectionVisuals();
+    zoomDisplay.textContent = `${Math.round(state.scale * 100)}%`;
+}
+</script>
 </body>
 </html>
