@@ -76,6 +76,28 @@
 
         .meta-input-valid   { border-color: #22c55e !important; background: #f0fdf4 !important; }
         .meta-input-invalid { border-color: #ef4444 !important; background: #fef2f2 !important; }
+
+        /* Areas Panel Styles */
+        #areas-panel {
+            position: fixed; top: 56px; right: 4px; z-index: 200;
+            background: white; border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            border: 1px solid #e2e8f0; width: 300px;
+            max-height: calc(100vh - 80px); display: none; flex-direction: column;
+            overflow: hidden;
+        }
+        #areas-panel.open { display: flex; }
+        .area-card {
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            transition: all 0.15s; cursor: pointer;
+        }
+        .area-card:hover { border-color: #6366f1; background: #f5f3ff; }
+        .area-card.active-area { border-color: #6366f1; background: #eef2ff; }
+        .area-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: #6366f1; color: white; border-radius: 999px;
+            font-size: 11px; font-weight: 700; min-width: 22px; height: 22px; padding: 0 6px;
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden font-sans">
@@ -96,6 +118,14 @@
             <input type="file" id="underlay-input" accept="image/*" class="hidden">
         </button>
         <div class="h-6 w-px bg-slate-200"></div>
+
+        <!-- AREAS BUTTON -->
+        <button onclick="toggleAreasPanel()" id="areas-btn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2 shadow-sm">
+            <i data-lucide="layout-grid" class="w-3 h-3"></i> Areas
+            <span id="areas-total-badge" class="hidden text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full"></span>
+        </button>
+
+        <div class="h-6 w-px bg-slate-200"></div>
         <div class="relative">
             <button onclick="toggleExportMenu()" id="export-btn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2 shadow-sm">
                 <i data-lucide="download" class="w-3 h-3"></i> Export <i data-lucide="chevron-down" class="w-3 h-3 ml-1 text-slate-400"></i>
@@ -112,6 +142,28 @@
         </label>
     </div>
 </header>
+
+<!-- AREAS PANEL -->
+<div id="areas-panel">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2">
+            <i data-lucide="layout-grid" class="w-4 h-4 text-indigo-600"></i>
+            <span class="font-bold text-sm text-slate-700">Icons Areas</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="areas-summary" class="text-[10px] text-slate-400 font-medium"></span>
+            <button onclick="closeAreasPanel()" class="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-200">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    </div>
+    <div id="areas-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+        <div class="text-xs text-slate-400 italic text-center py-6">
+            <i data-lucide="file-question" class="w-6 h-6 mx-auto mb-2 text-slate-300"></i>
+            Load an SVG file first
+        </div>
+    </div>
+</div>
 
 <main class="flex-1 flex overflow-hidden">
 
@@ -161,11 +213,11 @@
                         </div>
                         <div class="p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 leading-snug flex gap-1.5">
                             <i data-lucide="info" class="w-3 h-3 flex-shrink-0 mt-0.5"></i>
-                            <span>Sirf <strong>SVG ID</strong> set hoga. Metadata ID alag se manually enter karna hoga.</span>
+                            <span>Only the <strong>SVG ID</strong> will be set. Metadata ID must be entered manually.</span>
                         </div>
                         <div class="text-[10px] text-slate-400 italic">
                             <i data-lucide="mouse-pointer-click" class="w-3 h-3 inline mr-0.5"></i>
-                            Canvas element click karo to sequentially rename
+                            Click a canvas element to sequentially rename it
                         </div>
                     </div>
                 </div>
@@ -179,7 +231,7 @@
                 <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
                     <div id="manual-rename-hint" class="p-4 text-xs text-slate-400 italic text-center">
                         <i data-lucide="mouse-pointer" class="w-4 h-4 mx-auto mb-1 text-slate-300"></i>
-                        Canvas par element select karo
+                        Select an element on the canvas
                     </div>
                     <div id="manual-rename-form" class="hidden">
                         <!-- Selected element info -->
@@ -197,15 +249,10 @@
                         <!-- SVG ID rename -->
                         <div class="p-3 border-b border-slate-100">
                             <label class="text-[10px] text-slate-500 font-bold uppercase block mb-1.5">SVG Element ID</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="manual-new-id"
-                                    class="flex-1 text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    placeholder="New SVG ID...">
-                                <button onclick="applySVGIdOnly()"
-                                    class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded shadow-sm transition-colors">
-                                    Rename
-                                </button>
-                            </div>
+                            <input type="text" id="manual-new-id"
+                                class="w-full text-xs border border-slate-300 rounded px-2 py-1.5 font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Type new ID and press Enter...">
+                            <div id="svg-id-feedback" class="text-[10px] mt-1 min-h-[14px] text-slate-400">Press Enter to apply</div>
                         </div>
 
                         <!-- METADATA ID -->
@@ -214,7 +261,7 @@
                                 <label class="text-[10px] text-emerald-700 font-bold uppercase flex items-center gap-1">
                                     <i data-lucide="hash" class="w-3 h-3"></i> Metadata ID
                                 </label>
-                                <span class="text-[9px] text-slate-400">Sirf 0 se N digits</span>
+                                <span class="text-[9px] text-slate-400">Only whole numbers: 0 to N</span>
                             </div>
 
                             <!-- Current metadata value -->
@@ -226,25 +273,19 @@
 
                             <!-- Numbers used in same parent group -->
                             <div id="meta-used-numbers" class="hidden mb-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] leading-snug">
-                                <span class="font-bold text-red-700">Is group mein already used:</span>
+                                <span class="font-bold text-red-700">Already used in this group:</span>
                                 <span id="meta-used-list" class="font-mono text-red-600 ml-1"></span>
                             </div>
 
-                            <div class="flex gap-2 items-start">
-                                <div class="flex-1">
+                            <div class="flex-1">
                                     <input type="text" id="meta-id-input"
                                         inputmode="numeric"
                                         class="w-full text-base border-2 border-slate-300 rounded-lg px-3 py-2 font-mono font-bold focus:outline-none transition-colors"
-                                        placeholder="0, 1, 2 ... N">
+                                        placeholder="0, 1, 2 ... N — press Enter to save">
                                     <div id="meta-id-feedback" class="text-[10px] mt-1 min-h-[14px]"></div>
                                 </div>
-                                <button onclick="applyMetaId()"
-                                    class="mt-0.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors">
-                                    Save
-                                </button>
-                            </div>
                             <p class="text-[10px] text-slate-400 mt-2 leading-snug">
-                                ⚠ Same parent &lt;g&gt; mein duplicate number allow nahi hai. Auto Rename ya Bulk Rename se kabhi set nahi hota.
+                                ⚠ Duplicate numbers are not allowed within the same parent &lt;g&gt;. This is never set automatically by Auto Rename or Bulk Rename.
                             </p>
                         </div>
                     </div>
@@ -267,7 +308,7 @@
                     </div>
                     <div class="p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 flex gap-1">
                         <i data-lucide="alert-triangle" class="w-3 h-3 flex-shrink-0 mt-0.5"></i>
-                        <span>Sirf SVG IDs badlega — Metadata IDs unchanged rahenge.</span>
+                        <span>Only SVG IDs will change — Metadata IDs remain unchanged.</span>
                     </div>
                     <button onclick="applyBulkRename()" class="w-full py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded transition-colors">
                         Apply to All Matching Elements
@@ -282,10 +323,10 @@
                     <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Metadata ID Rules
                 </div>
                 <div class="space-y-1">
-                    <div>✔ Sirf <strong>whole number</strong>: 0, 1, 2 … N</div>
-                    <div>✔ Same parent <code class="bg-emerald-100 px-1 rounded">&lt;g&gt;</code> mein duplicate <strong>nahi</strong> chalega</div>
-                    <div>✔ Auto/Bulk Rename se <strong>kabhi auto-set nahi</strong> hoga</div>
-                    <div>✔ Har element ka Meta ID <strong>user manually</strong> enter karta hai</div>
+                    <div>✔ Only <strong>whole numbers</strong>: 0, 1, 2 … N</div>
+                    <div>✔ Duplicates are <strong>not allowed</strong> within the same parent <code class="bg-emerald-100 px-1 rounded">&lt;g&gt;</code></div>
+                    <div>✔ <strong>Never auto-set</strong> by Auto/Bulk Rename</div>
+                    <div>✔ Each element's Meta ID is <strong>manually entered</strong> by the user</div>
                 </div>
             </div>
         </div>
@@ -301,7 +342,7 @@
                 </h3>
                 <div class="text-xs text-slate-500 mb-3 p-2 bg-blue-50 rounded-lg">
                     <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
-                    <strong>Double-click</strong> ya <strong>Long-press (500ms)</strong> canvas element par to add to active group.
+                    <strong>Double-click</strong> or <strong>Long-press (500ms)</strong> on a canvas element to add to the active group.
                 </div>
                 <div id="relation-groups-list" class="space-y-3"></div>
             </div>
@@ -423,8 +464,136 @@ const state = {
     underlayImg: null, draggedLayer: null,
     autoNaming: { active: false, prefix: 'Light ', counter: 1 },
     longPressTimeout: null, isLongPressing: false,
-    confirmCallback: null, manualRenameTarget: null
+    confirmCallback: null, manualRenameTarget: null,
+    areasPanelOpen: false
 };
+
+// =============================================================
+// AREAS PANEL — parses Icons > child groups from loaded SVG
+// =============================================================
+
+function parseIconAreas(svg) {
+    if (!svg) return [];
+    const iconsGroup = svg.querySelector('g#Icons');
+    if (!iconsGroup) return [];
+
+    const areas = [];
+    const SKIP_TAGS = new Set(['metadata','title','desc','defs','style','script']);
+
+    for (const child of iconsGroup.children) {
+        if (child.nodeType !== 1) continue;
+        if (SKIP_TAGS.has(child.tagName)) continue;
+        if (child.tagName !== 'g') continue;
+
+        const areaId = child.id || child.tagName;
+        // Count direct child <g> elements (icons) inside this area group
+        let iconCount = 0;
+        for (const icon of child.children) {
+            if (icon.nodeType === 1 && icon.tagName === 'g' && !SKIP_TAGS.has(icon.tagName)) {
+                iconCount++;
+            }
+        }
+        areas.push({ id: areaId, element: child, iconCount });
+    }
+    return areas;
+}
+
+function renderAreasPanel(svg) {
+    const list = document.getElementById('areas-list');
+    const summary = document.getElementById('areas-summary');
+    const totalBadge = document.getElementById('areas-total-badge');
+
+    const areas = parseIconAreas(svg);
+
+    if (areas.length === 0) {
+        list.innerHTML = `
+            <div class="text-xs text-slate-400 italic text-center py-6">
+                <i data-lucide="alert-circle" class="w-6 h-6 mx-auto mb-2 text-slate-300"></i>
+                No <strong>Icons</strong> group found in this SVG
+            </div>`;
+        summary.textContent = '';
+        totalBadge.classList.add('hidden');
+        initIcons();
+        return;
+    }
+
+    const totalIcons = areas.reduce((s, a) => s + a.iconCount, 0);
+    summary.textContent = `${areas.length} areas · ${totalIcons} icons total`;
+
+    // Update header badge
+    totalBadge.textContent = areas.length;
+    totalBadge.classList.remove('hidden');
+
+    list.innerHTML = areas.map(area => `
+        <div class="area-card p-3" id="area-card-${area.id}" onclick="focusAreaOnCanvas('${area.id}')">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"></i>
+                    <span class="text-xs font-bold text-slate-700 font-mono truncate">${area.id}</span>
+                </div>
+                <span class="area-badge flex-shrink-0 ml-2">${area.iconCount}</span>
+            </div>
+            <div class="mt-1.5 text-[10px] text-slate-400">
+                ${area.iconCount} icon${area.iconCount !== 1 ? 's' : ''} inside this area
+            </div>
+        </div>
+    `).join('');
+
+    initIcons();
+}
+
+function focusAreaOnCanvas(areaId) {
+    const svg = svgContainer.querySelector('svg');
+    if (!svg) return;
+
+    // Highlight active card
+    document.querySelectorAll('.area-card').forEach(c => c.classList.remove('active-area'));
+    const card = document.getElementById(`area-card-${areaId}`);
+    if (card) card.classList.add('active-area');
+
+    const areaEl = svg.querySelector(`g#${areaId}`);
+    if (!areaEl) return;
+
+    handleSelection(areaEl, false);
+    const box = getTransformedBox(areaEl);
+    canvasWrapper.scrollTo({ left: Math.max(0, box.left - 80), top: Math.max(0, box.top - 80), behavior: 'smooth' });
+    statusBar.textContent = `Area "${areaId}" selected — ${countDirectIconChildren(areaEl)} icons`;
+}
+
+function countDirectIconChildren(groupEl) {
+    const SKIP_TAGS = new Set(['metadata','title','desc','defs','style','script']);
+    let count = 0;
+    for (const c of groupEl.children) {
+        if (c.nodeType === 1 && c.tagName === 'g' && !SKIP_TAGS.has(c.tagName)) count++;
+    }
+    return count;
+}
+
+function toggleAreasPanel() {
+    const panel = document.getElementById('areas-panel');
+    state.areasPanelOpen = !state.areasPanelOpen;
+    if (state.areasPanelOpen) {
+        panel.classList.add('open');
+        const svg = svgContainer.querySelector('svg');
+        if (svg) renderAreasPanel(svg);
+    } else {
+        panel.classList.remove('open');
+    }
+}
+
+function closeAreasPanel() {
+    state.areasPanelOpen = false;
+    document.getElementById('areas-panel').classList.remove('open');
+}
+
+// Close areas panel on outside click
+document.addEventListener('click', e => {
+    const panel = document.getElementById('areas-panel');
+    const btn = document.getElementById('areas-btn');
+    if (state.areasPanelOpen && !panel.contains(e.target) && !btn.contains(e.target)) {
+        closeAreasPanel();
+    }
+});
 
 // =============================================================
 // METADATA HELPERS
@@ -466,7 +635,6 @@ function writeMetadataValue(element, value) {
     eid.textContent = value;
 }
 
-// Returns parent <g> element or null if parent is <svg>/no group
 function getParentGroup(element) {
     if (!element) return null;
     const p = element.parentElement;
@@ -475,7 +643,6 @@ function getParentGroup(element) {
     return null;
 }
 
-// Returns Set of number-strings already used by siblings in same parent group
 function getUsedMetaIdsInGroup(element) {
     const used = new Set();
     const parent = getParentGroup(element);
@@ -490,15 +657,13 @@ function getUsedMetaIdsInGroup(element) {
     return used;
 }
 
-// Validate a metadata ID input
-// Returns { valid, error, normalized }
 function validateMetaId(rawValue, element) {
     const val = rawValue.trim();
-    if (val === '') return { valid: false, error: 'Number enter karo (0 ya usse bada)', normalized: '' };
-    if (!/^\d+$/.test(val)) return { valid: false, error: 'Sirf whole number allowed: 0, 1, 2 … N (no text, no decimal, no negative)', normalized: '' };
+    if (val === '') return { valid: false, error: 'Please enter a number (0 or greater)', normalized: '' };
+    if (!/^\d+$/.test(val)) return { valid: false, error: 'Only whole numbers allowed: 0, 1, 2 … N (no text, no decimal, no negative)', normalized: '' };
     const usedInGroup = getUsedMetaIdsInGroup(element);
     if (usedInGroup.has(val)) {
-        return { valid: false, error: `${val} already used hai is parent group mein! Alag number do.`, normalized: val };
+        return { valid: false, error: `${val} is already used in this parent group! Choose a different number.`, normalized: val };
     }
     return { valid: true, error: null, normalized: val };
 }
@@ -525,7 +690,7 @@ function onMetaInputChange() {
         feedback.classList.add('text-red-500');
     } else {
         input.classList.add('meta-input-valid');
-        feedback.textContent = '✓ Valid — Save dabao';
+        feedback.textContent = '✓ Valid — click Save';
         feedback.classList.add('text-emerald-600');
     }
 }
@@ -550,7 +715,6 @@ function applyMetaId() {
     flashElement(el, '#10b981');
     statusBar.textContent = `Metadata ID "${result.normalized}" saved for #${el.id || el.tagName}`;
 
-    // Refresh panel display
     refreshManualPanel(el);
 
     input.value = '';
@@ -562,32 +726,45 @@ function applyMetaId() {
         feedback.className = 'text-[10px] mt-1 min-h-[14px]';
     }, 2500);
 
-    // Also update metaId in relation groups list
     relationGroups.forEach(g => g.elements.forEach(e => {
         if (e.id === el.id) e.metaId = result.normalized;
     }));
     renderRelationGroups();
-    // Rebuild layer tree badge
     rebuildLayersTree(svgContainer.querySelector('svg'));
 }
 
 function applySVGIdOnly() {
     const el = state.manualRenameTarget;
-    const newId = document.getElementById('manual-new-id').value.trim();
-    if (!el || !newId) return;
+    const input = document.getElementById('manual-new-id');
+    const feedback = document.getElementById('svg-id-feedback');
+    const newId = input.value.trim();
+    if (!el || !newId) {
+        feedback.textContent = '⚠ Please type a new ID first';
+        feedback.className = 'text-[10px] mt-1 min-h-[14px] text-amber-500';
+        return;
+    }
+    if (newId === el.id) {
+        feedback.textContent = '— Same as current ID';
+        feedback.className = 'text-[10px] mt-1 min-h-[14px] text-slate-400';
+        return;
+    }
     const oldId = el.id;
     el.id = newId;
-    // !! DO NOT touch metadata - user sets it separately
     updateLayerLabel(el, newId);
     flashElement(el, '#6366f1');
     document.getElementById('manual-current-id').textContent = newId;
-    document.getElementById('manual-new-id').value = '';
+    input.value = '';
+    feedback.textContent = `✓ Renamed: "${oldId}" → "${newId}"`;
+    feedback.className = 'text-[10px] mt-1 min-h-[14px] text-indigo-600 font-bold';
+    setTimeout(() => {
+        feedback.textContent = 'Press Enter to apply';
+        feedback.className = 'text-[10px] mt-1 min-h-[14px] text-slate-400';
+    }, 2500);
     statusBar.textContent = `SVG ID: "${oldId}" → "${newId}" (Metadata ID unchanged)`;
     relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
     renderRelationGroups();
 }
 
-// Context right-click → Set Metadata ID: focus the input in panel
 function contextFocusMetaInput() {
     const el = state.contextTarget;
     if (!el) return;
@@ -599,7 +776,6 @@ function contextFocusMetaInput() {
     }, 120);
 }
 
-// Refresh the Manual Rename panel for a given element
 function refreshManualPanel(el) {
     document.getElementById('manual-rename-hint').classList.add('hidden');
     document.getElementById('manual-rename-form').classList.remove('hidden');
@@ -610,7 +786,6 @@ function refreshManualPanel(el) {
     const parent = getParentGroup(el);
     document.getElementById('manual-parent-id').textContent = parent ? (parent.id || `<g> (no id)`) : 'svg root';
 
-    // Current metadata
     const curMeta = getMetadataValue(el);
     const existDisp = document.getElementById('meta-existing-display');
     const existVal = document.getElementById('meta-existing-val');
@@ -621,7 +796,6 @@ function refreshManualPanel(el) {
         existDisp.classList.add('hidden');
     }
 
-    // Used numbers in group
     const usedSet = getUsedMetaIdsInGroup(el);
     const usedDiv = document.getElementById('meta-used-numbers');
     const usedList = document.getElementById('meta-used-list');
@@ -632,7 +806,14 @@ function refreshManualPanel(el) {
         usedDiv.classList.add('hidden');
     }
 
-    // Reset meta input state
+    // Reset SVG ID input
+    const svgInput = document.getElementById('manual-new-id');
+    svgInput.value = '';
+    const svgFb = document.getElementById('svg-id-feedback');
+    svgFb.textContent = 'Press Enter to apply';
+    svgFb.className = 'text-[10px] mt-1 min-h-[14px] text-slate-400';
+
+    // Reset meta ID input
     const metaInput = document.getElementById('meta-id-input');
     metaInput.value = '';
     metaInput.classList.remove('meta-input-valid', 'meta-input-invalid');
@@ -667,9 +848,32 @@ function initIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); 
 window.addEventListener('load', () => {
     initIcons();
     renderRelationGroups();
+
+    // Meta ID input — auto-save on Enter
     const metaInput = document.getElementById('meta-id-input');
     metaInput.addEventListener('input', onMetaInputChange);
     metaInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyMetaId(); });
+
+    // SVG ID input — auto-save on Enter
+    const svgIdInput = document.getElementById('manual-new-id');
+    svgIdInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') applySVGIdOnly();
+    });
+    svgIdInput.addEventListener('input', () => {
+        const feedback = document.getElementById('svg-id-feedback');
+        const el = state.manualRenameTarget;
+        const val = svgIdInput.value.trim();
+        if (!val) {
+            feedback.textContent = 'Press Enter to apply';
+            feedback.className = 'text-[10px] mt-1 min-h-[14px] text-slate-400';
+        } else if (el && val === el.id) {
+            feedback.textContent = '— Same as current ID';
+            feedback.className = 'text-[10px] mt-1 min-h-[14px] text-slate-400';
+        } else {
+            feedback.textContent = `↵ Press Enter to rename to "${val}"`;
+            feedback.className = 'text-[10px] mt-1 min-h-[14px] text-indigo-500 font-medium';
+        }
+    });
 });
 
 // =============================================================
@@ -736,7 +940,7 @@ function renderRelationGroups() {
             </div>
             <div class="border-t border-slate-100 p-2 space-y-1 max-h-52 overflow-y-auto text-[11px]">
                 ${group.elements.length === 0
-                    ? '<div class="text-slate-400 italic text-[10px] text-center py-2">No elements. Double-click canvas element to add.</div>'
+                    ? '<div class="text-slate-400 italic text-[10px] text-center py-2">No elements. Double-click a canvas element to add.</div>'
                     : group.elements.map(el => `
                         <div class="flex items-center gap-1 px-1 py-0.5 hover:bg-slate-100 rounded cursor-pointer group/item" onclick="selectElementById('${el.id}')">
                             <span class="text-slate-400 text-[10px]">(</span>
@@ -915,7 +1119,7 @@ function toggleAutoNameMode() {
         knob.classList.add('translate-x-5'); bg.classList.replace('bg-slate-200', 'bg-indigo-600');
         controls.classList.remove('opacity-50', 'pointer-events-none');
         deselectAll(); document.body.style.cursor = 'alias';
-        statusBar.textContent = 'Auto-Rename ON — sirf SVG ID set hoga';
+        statusBar.textContent = 'Auto-Rename ON — only SVG ID will be set';
     } else {
         knob.classList.remove('translate-x-5'); bg.classList.replace('bg-indigo-600', 'bg-slate-200');
         controls.classList.add('opacity-50', 'pointer-events-none');
@@ -928,12 +1132,11 @@ function applyAutoName(el) {
     const oldId = el.id;
     const newId = `${state.autoNaming.prefix}${state.autoNaming.counter}`;
     el.id = newId;
-    // !! NEVER touch metadata — user sets it
     state.autoNaming.counter++;
     document.getElementById('input-auto-counter').value = state.autoNaming.counter;
     updateLayerLabel(el, newId);
     flashElement(el, '#6366f1');
-    statusBar.textContent = `SVG ID → "${newId}" (Metadata ID nahi baala — manually set karo)`;
+    statusBar.textContent = `SVG ID → "${newId}" (Metadata ID not changed — set it manually)`;
 }
 
 // =============================================================
@@ -951,7 +1154,6 @@ function applyBulkRename() {
             const oldId = el.id;
             const newId = el.id.replaceAll(findStr, replaceStr);
             el.id = newId;
-            // !! NEVER touch metadata
             relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
             updateLayerLabel(el, newId);
             count++;
@@ -972,7 +1174,6 @@ function renameContextTarget() {
     const newId = prompt('Enter new SVG ID:', oldId);
     if (newId !== null && newId.trim() && newId !== oldId) {
         el.id = newId.trim();
-        // !! NEVER touch metadata
         updateLayerLabel(el, newId.trim());
         flashElement(el, '#3b82f6');
         statusBar.textContent = `SVG ID "${oldId}" → "${newId.trim()}" (Metadata unchanged)`;
@@ -1165,6 +1366,19 @@ function loadFile(file) {
             attachSVGListeners(svg); rebuildLayersTree(svg);
             statusBar.textContent = `${file.name} loaded`;
             zoomSlider.value = 100; zoomDisplay.textContent = '100%';
+
+            // AUTO-PARSE AREAS on load
+            const areas = parseIconAreas(svg);
+            if (areas.length > 0) {
+                const totalIcons = areas.reduce((s, a) => s + a.iconCount, 0);
+                const badge = document.getElementById('areas-total-badge');
+                badge.textContent = areas.length;
+                badge.classList.remove('hidden');
+                statusBar.textContent = `${file.name} loaded — ${areas.length} areas found (${totalIcons} icons total) in Icons group`;
+            }
+
+            // If areas panel is already open, refresh it
+            if (state.areasPanelOpen) renderAreasPanel(svg);
         }
     };
     reader.readAsText(file);
@@ -1347,7 +1561,6 @@ function rebuildLayersTree(rootSvg) {
         label.className = 'flex-1 truncate text-xs font-medium text-slate-600 select-none font-mono layer-label';
         label.textContent = node.id || node.tagName;
 
-        // Meta ID badge in tree
         const metaVal = getMetadataValue(node);
         const metaBadge = document.createElement('span');
         if (metaVal !== null) {
@@ -1394,7 +1607,6 @@ function startInlineRename(labelEl, svgNode) {
         input.replaceWith(newLabel);
         if (newId && newId !== currentId) {
             const oldId = svgNode.id; svgNode.id = newId;
-            // !! NEVER touch metadata
             relationGroups.forEach(g => g.elements.forEach(e => { if (e.id === oldId) e.id = newId; }));
             renderRelationGroups(); flashElement(svgNode, '#6366f1');
             statusBar.textContent = `SVG ID "${oldId}" → "${newId}" (Metadata ID unchanged)`;
